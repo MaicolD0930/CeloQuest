@@ -1,0 +1,77 @@
+import { NextRequest, NextResponse } from "next/server";
+import type { Hash } from "viem";
+import { prisma } from "@/lib/prisma";
+import { getCurrentUser } from "@/lib/session";
+import { todayKey } from "@/lib/game";
+import { verifyAndRecordRecoveryPayment } from "@/lib/payments/recovery";
+import { normalizeRecoveryTokenParam } from "@/lib/tokens/recovery";
+
+export async function POST(req: NextRequest) {
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  }
+
+  const body = await req.json().catch(() => null);
+  const txHash = typeof body?.txHash === "string" ? body.txHash : null;
+  const token = normalizeRecoveryTokenParam(body?.token);
+
+  if (!txHash) {
+    return NextResponse.json({ error: "txHash required" }, { status: 400 });
+  }
+
+  const date = todayKey();
+  const attempt = await prisma.dailyAttempt.findUnique({
+    where: { userId_date: { userId: user.id, date } },
+  });
+
+  if (!attempt) {
+    return NextResponse.json({ error: "Challenge not started" }, { status: 404 });
+  }
+  if (attempt.completedAt) {
+    return NextResponse.json({ error: "Challenge already completed" }, { status: 409 });
+  }
+  if (attempt.result !== "awaiting_refill") {
+    return NextResponse.json({ error: "Refill not available" }, { status: 400 });
+  }
+  if (attempt.lifeRefillUsed) {
+    return NextResponse.json({ error: "REFILL_ALREADY_USED" }, { status: 409 });
+  }
+
+  const verification = await verifyAndRecordRecoveryPayment(
+    txHash as Hash,
+    user.walletAddress,
+    token
+  );
+  if (!verification.ok) {
+    return NextResponse.json({ error: verification.reason }, { status: 402 });
+  }
+
+  const alreadyUsedTx = await prisma.dailyAttempt.findFirst({
+    where: { refillTxHash: txHash },
+  });
+  if (alreadyUsedTx) {
+    return NextResponse.json({ error: "TX_ALREADY_USED" }, { status: 409 });
+  }
+
+  const updated = await prisma.dailyAttempt.update({
+    where: { id: attempt.id },
+    data: {
+      livesLeft: 1,
+      lifeRefillUsed: true,
+      result: "in_progress",
+      refillTxHash: txHash,
+      refillToken: token,
+      startedAt: new Date(),
+    },
+  });
+
+  return NextResponse.json({
+    ok: true,
+    livesLeft: updated.livesLeft,
+    startedAt: updated.startedAt,
+    activeDurationMs: updated.durationMs ?? 0,
+    timerPaused: false,
+    message: "Life restored. Continue your daily challenge!",
+  });
+}
