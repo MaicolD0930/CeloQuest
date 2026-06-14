@@ -4,23 +4,50 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && prisma migrate deploy && next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:seed:force": "tsx prisma/seed.ts --force",
+    "db:setup": "prisma migrate deploy && tsx prisma/seed.ts",
+    "db:reset-today": "tsx scripts/reset-today.ts",
+    "db:migrate": "prisma migrate deploy",
+    "db:migrate:dev": "prisma migrate dev",
+    "contracts:compile": "hardhat compile",
+    "contracts:deploy:tcopm": "hardhat run scripts/deploy-tcopm.js --network celoSepolia",
+    "contracts:deploy:recovery": "hardhat run scripts/deploy-recovery-payment.js --network celoSepolia",
+    "contracts:deploy:rewards": "hardhat run scripts/deploy-rewards.js --network celoSepolia",
+    "contracts:sync:recovery-prices": "hardhat run scripts/sync-recovery-prices.js --network celoSepolia",
+    "contracts:mint:tcopm": "hardhat run scripts/mint-tcopm.js --network celoSepolia",
+    "contracts:mint:tcopm:supply": "hardhat run scripts/mint-tcopm-supply.js --network celoSepolia",
+    "contracts:send:celo": "hardhat run scripts/send-celo.js --network celoSepolia",
+    "postinstall": "prisma generate"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
+    "@prisma/client": "^6.19.3",
+    "lucide-react": "^1.18.0",
     "next": "16.2.9",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "viem": "^2.52.2"
   },
   "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@openzeppelin/contracts": "^5.3.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv": "^16.4.7",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
+    "hardhat": "^2.22.18",
+    "prisma": "^6.19.3",
     "tailwindcss": "^4",
+    "tsx": "^4.22.4",
     "typescript": "^5"
   }
 }
