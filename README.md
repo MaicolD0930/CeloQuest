@@ -2,7 +2,7 @@
 
 > Learn Web3. Explore Celo. Earn your place.
 
-CeloQuest es una plataforma de onboarding gamificada para el ecosistema **Celo**, pensada para el **Celo Colombia Hackathon**. Convierte personas sin experiencia blockchain en usuarios activos mediante retos diarios estilo Duolingo: preguntas, XP, rachas, niveles, ranking semanal y recompensas on-chain en **tCOPM**.
+CeloQuest es una plataforma de onboarding gamificada para el ecosistema **Celo**, pensada para el **Celo Colombia Hackathon**. Convierte personas sin experiencia blockchain en usuarios activos mediante retos diarios con las siguientes caracteristicas: preguntas, XP, rachas, niveles, ranking semanal y recompensas on-chain en **tCOPM**.
 
 ## Características
 
