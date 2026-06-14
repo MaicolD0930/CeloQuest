@@ -1,65 +1,223 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useEffect } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { ArrowRight } from "lucide-react";
+import { useLocale } from "@/lib/i18n/LocaleProvider";
+import { LanguageToggle } from "@/components/LanguageToggle";
+import { LandingOctopus } from "@/components/landing/LandingOctopus";
+
+export default function LandingPage() {
+  const { t } = useLocale();
+  const router = useRouter();
+
+  useEffect(() => {
+    fetch("/api/users/me", { credentials: "include" })
+      .then((r) => (r.ok ? router.replace("/home") : null))
+      .catch(() => null);
+  }, [router]);
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <main className="home-perfil landing-page relative flex min-h-dvh flex-1 flex-col overflow-hidden safe-top">
+      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
+        <div className="absolute -top-32 -left-24 h-96 w-96 animate-landing-blob rounded-full bg-prosperity/25 blur-3xl" />
+        <div
+          className="absolute top-1/3 -right-32 h-[28rem] w-[28rem] animate-landing-blob rounded-full bg-lemon/15 blur-3xl"
+          style={{ animationDelay: "3s" }}
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+        <div
+          className="absolute bottom-0 left-1/4 h-80 w-80 animate-landing-blob rounded-full bg-prosperity/15 blur-3xl"
+          style={{ animationDelay: "6s" }}
+        />
+        <div
+          className="absolute inset-0 opacity-[0.04]"
+          style={{
+            backgroundImage: "radial-gradient(circle, #fff 1px, transparent 1px)",
+            backgroundSize: "28px 28px",
+          }}
+        />
+      </div>
+
+      <header className="relative z-10 flex justify-end px-4 pb-2">
+        <LanguageToggle variant="perfil" />
+      </header>
+
+      <section className="relative z-10 mx-auto flex flex-1 flex-col items-center px-4 pb-10 pt-4 text-center">
+        <div className="animate-card-pop">
+          <LandingOctopus />
+        </div>
+
+        <h1
+          className="animate-card-pop mt-6 font-display text-5xl font-black tracking-tight"
+          style={{ animationDelay: "120ms" }}
+        >
+          <span className="landing-brand-celo">Celo</span>
+          <span className="landing-brand-quest">Quest</span>
+        </h1>
+
+        <p
+          className="animate-card-pop mt-4 max-w-xs text-base font-semibold text-h-muted"
+          style={{ animationDelay: "200ms" }}
+        >
+          {t.landing.tagline}
+        </p>
+
+        <div
+          className="animate-card-pop mt-8 grid w-full grid-cols-3 gap-3"
+          style={{ animationDelay: "280ms" }}
+        >
+          {t.landing.stats.map((s, i) => (
+            <div
+              key={s.label}
+              className="rounded-2xl bg-surface px-2 py-3 ring-1 ring-h-border card-depth-sm"
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+              <div
+                className={`font-display text-lg font-extrabold ${
+                  i === 0 ? "text-lemon" : i === 1 ? "text-h-foreground" : "text-prosperity"
+                }`}
+              >
+                {s.value}
+              </div>
+              <div className="text-[10px] font-bold uppercase tracking-wider text-h-muted">
+                {s.label}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div
+          className="animate-card-pop mt-10 flex w-full flex-col gap-3.5"
+          style={{ animationDelay: "360ms" }}
+        >
+          <LandingCTA
+            href="/onboarding"
+            variant="primary"
+            icon="🚀"
+            title={t.landing.firstStep}
+            subtitle={t.landing.firstStepHint}
+          />
+          <p className="text-center text-xs font-bold uppercase tracking-wide text-h-muted">
+            {t.landing.chooseWallet}
           </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+          <div className="grid grid-cols-2 gap-3">
+            <LandingWalletCTA
+              href="/connect?wallet=metamask"
+              icon="🦊"
+              name="MetaMask"
+              actionLabel={t.landing.connectWith}
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            <LandingWalletCTA
+              href="/connect?wallet=rabby"
+              icon="🐰"
+              name="Rabby"
+              actionLabel={t.landing.connectWith}
+            />
+          </div>
         </div>
-      </main>
-    </div>
+
+        <p
+          className="animate-card-pop mt-10 text-xs font-semibold text-h-muted"
+          style={{ animationDelay: "440ms" }}
+        >
+          {t.landing.poweredBy}{" "}
+          <span className="text-prosperity">💚</span>
+        </p>
+      </section>
+    </main>
+  );
+}
+
+function LandingWalletCTA({
+  href,
+  icon,
+  name,
+  actionLabel,
+}: {
+  href: string;
+  icon: string;
+  name: string;
+  actionLabel: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="landing-cta-secondary landing-cta group relative block w-full overflow-hidden rounded-[1.25rem]"
+    >
+      <div className="relative flex flex-col items-center gap-2 px-4 py-5">
+        <span className="text-3xl">{icon}</span>
+        <span className="font-display text-base font-bold text-h-foreground">{name}</span>
+        <span className="inline-flex items-center gap-1 text-xs font-semibold text-prosperity">
+          {actionLabel}
+          <ArrowRight className="size-3.5" />
+        </span>
+      </div>
+    </Link>
+  );
+}
+
+function LandingCTA({
+  href,
+  variant,
+  icon,
+  title,
+  subtitle,
+}: {
+  href: string;
+  variant: "primary" | "ghost";
+  icon: string;
+  title: string;
+  subtitle: string;
+}) {
+  const isPrimary = variant === "primary";
+
+  return (
+    <Link
+      href={href}
+      className={`landing-cta group relative block w-full overflow-hidden rounded-[1.25rem] ${
+        isPrimary ? "landing-cta-primary" : "landing-cta-secondary"
+      }`}
+    >
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent opacity-0 transition-[transform,opacity] duration-700 group-hover:translate-x-full group-hover:opacity-100"
+      />
+      <div className="relative flex items-center gap-3.5 px-5 py-4">
+        <span
+          className={`grid size-11 shrink-0 place-items-center rounded-xl text-xl transition-transform duration-200 group-hover:scale-110 ${
+            isPrimary
+              ? "bg-h-background/15 ring-1 ring-h-background/20"
+              : "bg-prosperity/15 ring-1 ring-prosperity/25"
+          }`}
+        >
+          {icon}
+        </span>
+        <div className="min-w-0 flex-1 text-left">
+          <div
+            className={`truncate font-display text-base font-bold leading-tight ${
+              isPrimary ? "text-h-background" : "text-h-foreground"
+            }`}
+          >
+            {title}
+          </div>
+          <div
+            className={`mt-0.5 truncate text-xs font-semibold ${
+              isPrimary ? "text-h-background/75" : "text-prosperity"
+            }`}
+          >
+            {subtitle}
+          </div>
+        </div>
+        <span
+          className={`grid size-9 shrink-0 place-items-center rounded-xl transition-all duration-200 group-hover:translate-x-0.5 ${
+            isPrimary
+              ? "bg-h-background/10 text-h-background group-hover:bg-h-background/20"
+              : "bg-h-background/50 text-h-muted ring-1 ring-h-border group-hover:bg-prosperity/20 group-hover:text-prosperity group-hover:ring-prosperity/40"
+          }`}
+        >
+          <ArrowRight className="size-4" />
+        </span>
+      </div>
+    </Link>
   );
 }
