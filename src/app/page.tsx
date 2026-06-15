@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 import { ArrowRight } from "lucide-react";
 import { useLocale } from "@/lib/i18n/LocaleProvider";
 import { LanguageToggle } from "@/components/LanguageToggle";
-import { LandingOctopus } from "@/components/landing/LandingOctopus";
+import { DraggableOctopus } from "@/components/landing/DraggableOctopus";
+import { LandingBackground } from "@/components/landing/LandingBackground";
 
 export default function LandingPage() {
   const { t } = useLocale();
@@ -20,24 +21,7 @@ export default function LandingPage() {
 
   return (
     <main className="home-perfil landing-page relative flex min-h-dvh flex-1 flex-col overflow-hidden safe-top">
-      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
-        <div className="absolute -top-32 -left-24 h-96 w-96 animate-landing-blob rounded-full bg-prosperity/25 blur-3xl" />
-        <div
-          className="absolute top-1/3 -right-32 h-[28rem] w-[28rem] animate-landing-blob rounded-full bg-lemon/15 blur-3xl"
-          style={{ animationDelay: "3s" }}
-        />
-        <div
-          className="absolute bottom-0 left-1/4 h-80 w-80 animate-landing-blob rounded-full bg-prosperity/15 blur-3xl"
-          style={{ animationDelay: "6s" }}
-        />
-        <div
-          className="absolute inset-0 opacity-[0.04]"
-          style={{
-            backgroundImage: "radial-gradient(circle, #fff 1px, transparent 1px)",
-            backgroundSize: "28px 28px",
-          }}
-        />
-      </div>
+      <LandingBackground />
 
       <header className="relative z-10 flex justify-end px-4 pb-2">
         <LanguageToggle variant="perfil" />
@@ -45,7 +29,7 @@ export default function LandingPage() {
 
       <section className="relative z-10 mx-auto flex flex-1 flex-col items-center px-4 pb-10 pt-4 text-center">
         <div className="animate-card-pop">
-          <LandingOctopus />
+          <DraggableOctopus imageSrc="/images/octopus.png" />
         </div>
 
         <h1

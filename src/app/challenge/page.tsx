@@ -368,6 +368,26 @@ export default function ChallengePage() {
     setCurrentIndex((i) => i + 1);
   }
 
+  function requiredAmountForToken(
+    token: RecoveryToken,
+    override?: string
+  ): string {
+    if (override) return override;
+    if (tokenPriceLabels[token]) return tokenPriceLabels[token];
+    if (token === "USDC") return `${recoveryPriceUsd.toFixed(2)} USDC`;
+    return `${recoveryPriceUsd.toFixed(2)} USD`;
+  }
+
+  function insufficientBalanceMessage(
+    token: RecoveryToken,
+    override?: string
+  ): string {
+    return t.challenge.insufficientBalance.replace(
+      "{amount}",
+      requiredAmountForToken(token, override)
+    );
+  }
+
   function refillErrorMessage(err: unknown, apiError?: string): string {
     if (apiError === "INVALID_PAYMENT") return t.challenge.refillInvalidPayment;
     if (apiError === "TX_FAILED") return t.challenge.refillTxFailed;
@@ -385,7 +405,7 @@ export default function ChallengePage() {
         case "WALLET_MISMATCH":
           return t.challenge.walletMismatch;
         case "INSUFFICIENT_BALANCE":
-          return t.challenge.insufficientBalance;
+          return insufficientBalanceMessage(selectedToken);
         case "PAYMENT_NOT_CONFIGURED":
           return t.challenge.refillNotConfigured;
         case "PREPARE_FAILED":
@@ -427,7 +447,14 @@ export default function ChallengePage() {
           setSessionWallet(bal.walletAddress);
         }
         if (!bal.sufficient) {
-          setRefillError(t.challenge.insufficientBalance);
+          setRefillError(
+            insufficientBalanceMessage(
+              selectedToken,
+              typeof bal.requiredDisplay === "string"
+                ? bal.requiredDisplay
+                : undefined
+            )
+          );
           return;
         }
       }

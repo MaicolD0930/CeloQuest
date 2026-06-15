@@ -25,8 +25,17 @@ export async function buildDailyQuestionIds(params: {
   xpTotal: number;
   dateKey: string;
   excludeTodayAttempt?: boolean;
+  extraExcludeIds?: Iterable<string>;
+  seedExtra?: string;
 }): Promise<string[]> {
-  const { userId, xpTotal, dateKey, excludeTodayAttempt = false } = params;
+  const {
+    userId,
+    xpTotal,
+    dateKey,
+    excludeTodayAttempt = false,
+    extraExcludeIds,
+    seedExtra,
+  } = params;
   const userLevel = computeLearningLevel(xpTotal).level;
 
   const all = await getQuestionPool();
@@ -42,6 +51,9 @@ export async function buildDailyQuestionIds(params: {
   });
 
   const excludeIds = collectRecentQuestionIds(recentAttempts);
+  if (extraExcludeIds) {
+    for (const id of extraExcludeIds) excludeIds.add(id);
+  }
 
   return pickAdaptiveQuestions({
     pool: all,
@@ -49,5 +61,6 @@ export async function buildDailyQuestionIds(params: {
     dateKey,
     userLevel,
     excludeIds,
+    seedExtra,
   });
 }

@@ -2,14 +2,15 @@
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import {
   Award,
   CheckCircle2,
   Clock,
   ExternalLink,
   Gift,
+  HelpCircle,
   Sparkles,
+  X,
 } from "lucide-react";
 import { useLocale } from "@/lib/i18n/LocaleProvider";
 import { LanguageToggle } from "@/components/LanguageToggle";
@@ -17,6 +18,7 @@ import { ProfileMenu } from "@/components/ProfileMenu";
 import { BottomNav } from "@/components/BottomNav";
 import { useMe } from "@/hooks/useMe";
 import { AchievementSeasonLabel } from "@/components/AchievementSeasonLabel";
+import { AchievementImageButton } from "@/components/AchievementImageButton";
 
 type AchievementItem = {
   id: string;
@@ -50,6 +52,7 @@ export default function AchievementsPage() {
   const [loading, setLoading] = useState(true);
   const [claiming, setClaiming] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [nftHelpOpen, setNftHelpOpen] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
@@ -77,6 +80,15 @@ export default function AchievementsPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (!nftHelpOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setNftHelpOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [nftHelpOpen]);
 
   async function handleClaim(type: string) {
     setClaiming(type);
@@ -146,13 +158,51 @@ export default function AchievementsPage() {
           <div className="space-y-6">
             {(data?.pendingCount ?? 0) > 0 && (
               <div className="animate-card-pop rounded-2xl bg-lemon/15 p-4 ring-1 ring-lemon/30">
-                <p className="flex items-center gap-2 font-display font-bold text-h-foreground">
-                  <Sparkles className="size-5 text-lemon" />
-                  {t.achievements.newUnlocked}
-                </p>
-                <p className="mt-1 text-sm text-h-muted">
-                  {t.achievements.newUnlockedBody}
-                </p>
+                <div className="flex items-start gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="flex items-center gap-2 font-display font-bold text-h-foreground">
+                      <Sparkles className="size-5 shrink-0 text-lemon" />
+                      {t.achievements.newUnlocked}
+                    </p>
+                    <p className="mt-1 text-sm text-h-muted">
+                      {t.achievements.newUnlockedBody}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setNftHelpOpen((open) => !open)}
+                    className={`grid size-9 shrink-0 place-items-center rounded-xl ring-1 transition-colors active:scale-95 ${
+                      nftHelpOpen
+                        ? "bg-surface text-h-foreground ring-h-border"
+                        : "bg-surface/80 text-h-muted ring-h-border hover:text-h-foreground"
+                    }`}
+                    aria-label={t.achievements.nftHelpAria}
+                    aria-expanded={nftHelpOpen}
+                  >
+                    <HelpCircle className="size-5" />
+                  </button>
+                </div>
+                {nftHelpOpen && (
+                  <article
+                    role="dialog"
+                    aria-label={t.achievements.nftHelpAria}
+                    className="mt-3 overflow-hidden rounded-2xl bg-surface ring-1 ring-h-border"
+                  >
+                    <div className="relative p-4">
+                      <button
+                        type="button"
+                        onClick={() => setNftHelpOpen(false)}
+                        className="absolute right-3 top-3 grid size-8 place-items-center rounded-lg text-h-muted transition-colors hover:bg-h-background hover:text-h-foreground"
+                        aria-label={t.achievements.modalClose}
+                      >
+                        <X className="size-4" />
+                      </button>
+                      <p className="pr-10 text-sm leading-relaxed text-h-muted">
+                        {t.achievements.nftHelpBody}
+                      </p>
+                    </div>
+                  </article>
+                )}
               </div>
             )}
 
@@ -264,21 +314,13 @@ function AchievementSection({
             className="overflow-hidden rounded-2xl bg-surface ring-1 ring-h-border"
           >
             <div className="flex gap-3 p-4">
-              {a.image ? (
-                <div className="relative size-16 shrink-0 overflow-hidden rounded-xl bg-h-background ring-1 ring-h-border">
-                  <Image
-                    src={a.image}
-                    alt={a.title}
-                    fill
-                    className="object-cover"
-                    unoptimized
-                  />
-                </div>
-              ) : (
-                <span className="grid size-16 shrink-0 place-items-center rounded-xl bg-h-background text-3xl ring-1 ring-h-border">
-                  {a.emoji}
-                </span>
-              )}
+              <AchievementImageButton
+                image={a.image}
+                emoji={a.emoji}
+                title={a.title}
+                description={a.description}
+                size="md"
+              />
               <div className="min-w-0 flex-1">
                 <p className="font-display font-bold">{a.title}</p>
                 <p className="mt-0.5 text-xs text-h-muted">{a.description}</p>

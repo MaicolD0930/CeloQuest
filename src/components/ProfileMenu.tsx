@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Menu, Shield, TrendingUp } from "lucide-react";
+import { HelpCircle, Menu, Shield, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n/LocaleProvider";
+import { invalidateChallengeCache } from "@/lib/client/challenge-cache";
+import { invalidateMeCache } from "@/lib/client/me-cache";
 
 type Props = {
   username: string;
@@ -37,6 +39,8 @@ export function ProfileMenu({
 
   async function handleLogout() {
     setLoggingOut(true);
+    invalidateMeCache();
+    invalidateChallengeCache();
     await fetch("/api/auth/logout", { method: "POST" });
     router.replace("/");
   }
@@ -103,6 +107,15 @@ export function ProfileMenu({
           >
             <TrendingUp className="size-4" />
             {t.home.myProgress}
+          </Link>
+
+          <Link
+            href="/help"
+            onClick={() => setOpen(false)}
+            className={`${itemClass} text-prosperity hover:bg-prosperity/10`}
+          >
+            <HelpCircle className="size-4" />
+            {t.profile.faq}
           </Link>
 
           {isAdmin ? (

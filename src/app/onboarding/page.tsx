@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowRight, ChevronRight, ExternalLink } from "lucide-react";
+import { ArrowLeft, ArrowRight, ChevronRight, ExternalLink } from "lucide-react";
 import { useLocale } from "@/lib/i18n/LocaleProvider";
 import { TutorialVideoScreen } from "@/components/video/TutorialVideoScreen";
 import type { TutorialVideoId } from "@/lib/videos/catalog";
@@ -77,6 +77,15 @@ function OnboardingContent() {
               👛 {t.onboarding.connectAndEnter}
               <ArrowRight className="size-5" />
             </button>
+
+            <button
+              type="button"
+              onClick={() => setStep(slides.length - 1)}
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-surface py-4 font-display text-base font-bold text-h-foreground ring-1 ring-h-border transition-transform active:scale-[0.98]"
+            >
+              <ArrowLeft className="size-5" />
+              {t.onboarding.prev}
+            </button>
           </div>
         ) : (
           <>
@@ -101,16 +110,28 @@ function OnboardingContent() {
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={() =>
-                isLastSlide ? setStep(slides.length) : setStep(step + 1)
-              }
-              className="btn-chunky flex w-full items-center justify-center gap-2 rounded-2xl bg-lemon py-4 font-display text-lg font-bold text-h-background"
-            >
-              {isLastSlide ? t.onboarding.seeResources : t.onboarding.next}
-              <ArrowRight className="size-5" />
-            </button>
+            <div className="flex flex-col gap-3">
+              {step > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setStep(step - 1)}
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl bg-surface py-4 font-display text-base font-bold text-h-foreground ring-1 ring-h-border transition-transform active:scale-[0.98]"
+                >
+                  <ArrowLeft className="size-5" />
+                  {t.onboarding.prev}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() =>
+                  isLastSlide ? setStep(slides.length) : setStep(step + 1)
+                }
+                className="btn-chunky flex w-full items-center justify-center gap-2 rounded-2xl bg-lemon py-4 font-display text-lg font-bold text-h-background"
+              >
+                {isLastSlide ? t.onboarding.seeResources : t.onboarding.next}
+                <ArrowRight className="size-5" />
+              </button>
+            </div>
           </>
         )}
       </main>

@@ -19,6 +19,7 @@ const es = {
   },
   onboarding: {
     back: "Volver",
+    prev: "Anterior",
     next: "Siguiente",
     seeResources: "Ver recursos",
     resourcesTitle: "Crea tu wallet",
@@ -36,9 +37,19 @@ const es = {
     },
     slides: [
       {
+        emoji: "🌐",
+        title: "¿Qué es Web3?",
+        body: "Web3 es una nueva forma de usar internet donde las personas pueden tener más control sobre sus activos digitales y participar en nuevas experiencias usando tecnología blockchain.",
+      },
+      {
+        emoji: "✨",
+        title: "¿Tengo que saber de tecnología para usar Web3?",
+        body: "No. Muchas aplicaciones están diseñadas para que cualquier persona pueda empezar sin conocimientos previos.",
+      },
+      {
         emoji: "🧱",
         title: "¿Qué es blockchain?",
-        body: "Imagina un cuaderno digital compartido por miles de personas. Nadie puede borrarlo ni hacer trampa. Ahí se guarda quién envió qué a quién.",
+        body: "Imagina un cuaderno digital que muchas personas pueden consultar al mismo tiempo. Lo que se escribe ahí queda registrado y nadie puede cambiarlo fácilmente. En ese cuaderno se pueden guardar acciones, movimientos y logros de forma segura.",
       },
       {
         emoji: "👛",
@@ -48,7 +59,7 @@ const es = {
       {
         emoji: "💛",
         title: "¿Qué es Celo?",
-        body: "Celo es una blockchain pensada para celulares: pagos rápidos, comisiones mínimas y acceso global a herramientas financieras.",
+        body: "Celo es una tecnología que permite crear nuevas formas de usar dinero y aplicaciones digitales de manera rápida y sencilla desde tu celular.",
       },
       {
         emoji: "📱",
@@ -99,9 +110,61 @@ const es = {
   },
   profile: {
     menu: "Menú de perfil",
+    faq: "Preguntas frecuentes",
     logout: "Cerrar sesión",
     loggingOut: "Cerrando...",
     admin: "Administrar",
+  },
+  faq: {
+    title: "Preguntas frecuentes",
+    subtitle: "Tu guía express para jugar, subir de nivel y sacarle jugo a CeloQuest",
+    items: [
+      {
+        question: "¿Qué es CeloQuest?",
+        answer:
+          "¡Tu aventura Web3 en modo juego! Aprende blockchain y el ecosistema Celo con retos diarios, suma XP, desbloquea logros y demuestra tu progreso on-chain.",
+      },
+      {
+        question: "¿Cómo gano experiencia?",
+        answer:
+          "Cada acierto cuenta. Completa el reto del día, mantén tu racha y participa cada semana: cuanto más juegas, más XP acumulas y más rápido subes de nivel.",
+      },
+      {
+        question: "¿Qué son los logros?",
+        answer:
+          "Son tus trofeos digitales: metas como tu primer reto, una racha de días seguidos o alcanzar un nuevo nivel. Cada uno cuenta un capítulo de tu historia en CeloQuest.",
+      },
+      {
+        question: "¿Cómo reclamo una medalla?",
+        answer:
+          'Cuando desbloqueas uno, aparece listo en "Mis logros". Entra, pulsa reclamar y llévatelo a tu wallet como medalla NFT.',
+      },
+      {
+        question: "¿Cómo funciona el ranking semanal?",
+        answer:
+          "Cada semana es una nueva carrera. Suma XP, escala en el leaderboard y compite por recompensas exclusivas: los mejores de la temporada se llevan premios especiales.",
+      },
+      {
+        question: "¿Qué pasa si pierdo mi vida diaria?",
+        answer:
+          "¡No te quedes fuera! Puedes volver mañana con una vida nueva o recuperar tu intento del día con la opción de pago disponible en el reto.",
+      },
+      {
+        question: "¿Cuándo se reinician las vidas?",
+        answer:
+          "Cada día empiezas con energía fresca: las vidas se renuevan automáticamente para que siempre tengas una nueva oportunidad de jugar.",
+      },
+      {
+        question: "¿Qué recompensas puedo recibir?",
+        answer:
+          "Insignias en la app, medallas NFT on-chain, premios semanales en tokens y reconocimiento ante la comunidad. Juega, aprende y convierte tu progreso en recompensas reales.",
+      },
+      {
+        question: "¿Dónde veo mis logros?",
+        answer:
+          'Todo en un solo lugar: entra a "Mis logros" para ver lo que ya ganaste, lo pendiente por reclamar y cuánto te falta para el siguiente hito.',
+      },
+    ],
   },
   admin: {
     title: "Panel admin",
@@ -285,7 +348,7 @@ const es = {
     refillPriceNote: "0.10 por recuperación",
     selectPaymentToken: "Moneda de pago",
     payWithToken: "Pagar con {token}",
-    insufficientBalance: "Saldo insuficiente. Necesitas al menos 0.10 del token elegido.",
+    insufficientBalance: "Saldo insuficiente. Necesitas al menos {amount}.",
     yourBalance: "Tu saldo",
     processingPayment: "Procesando pago...",
     waitForReset: "Esperar al próximo reinicio (UTC)",
@@ -349,6 +412,9 @@ const es = {
     subtitle: "NFTs de logros vinculados a tu wallet",
     newUnlocked: "¡Nuevo logro desbloqueado!",
     newUnlockedBody: "Reclama tu NFT on-chain cuando quieras.",
+    nftHelpAria: "¿Qué es un NFT?",
+    nftHelpBody:
+      "Los NFTs en CeloQuest funcionan como medallas de aprendizaje. Cada vez que avanzas, completas retos o ganas una competencia, puedes obtener un reconocimiento digital que representa tu progreso.",
     available: "Disponibles para reclamar",
     noAvailable: "No tienes logros pendientes. Sigue jugando para desbloquear más.",
     claimed: "NFTs reclamados",
@@ -363,6 +429,8 @@ const es = {
     statusBadge: "Insignia",
     statusFailed: "Error de mint",
     viewHistory: "Ver historial y medallas",
+    modalClose: "Cerrar",
+    modalDragHint: "Arrastra para rotar en 3D",
   },
   common: {
     appName: "CeloQuest",
@@ -398,6 +466,7 @@ const en: Dict = {
   },
   onboarding: {
     back: "Back",
+    prev: "Previous",
     next: "Next",
     seeResources: "See resources",
     resourcesTitle: "Create your wallet",
@@ -415,9 +484,19 @@ const en: Dict = {
     },
     slides: [
       {
+        emoji: "🌐",
+        title: "What is Web3?",
+        body: "Web3 is a new way to use the internet where people can have more control over their digital assets and take part in new experiences powered by blockchain technology.",
+      },
+      {
+        emoji: "✨",
+        title: "Do I need to know technology to use Web3?",
+        body: "No. Many apps are built so anyone can get started without prior knowledge.",
+      },
+      {
         emoji: "🧱",
         title: "What is blockchain?",
-        body: "Imagine a digital notebook shared by thousands of people. No one can erase it or cheat. It records who sent what to whom.",
+        body: "Imagine a digital notebook that many people can check at the same time. What gets written there stays on record and no one can change it easily. That notebook can store actions, transactions, and achievements securely.",
       },
       {
         emoji: "👛",
@@ -427,7 +506,7 @@ const en: Dict = {
       {
         emoji: "💛",
         title: "What is Celo?",
-        body: "Celo is a blockchain built for mobile: fast payments, minimal fees, and global access to financial tools.",
+        body: "Celo is technology that makes it easy to use money and digital apps in new ways—quickly and simply—from your phone.",
       },
       {
         emoji: "📱",
@@ -478,9 +557,61 @@ const en: Dict = {
   },
   profile: {
     menu: "Profile menu",
+    faq: "FAQ",
     logout: "Log out",
     loggingOut: "Logging out...",
     admin: "Admin",
+  },
+  faq: {
+    title: "Frequently asked questions",
+    subtitle: "Your quick guide to play, level up, and get the most out of CeloQuest",
+    items: [
+      {
+        question: "What is CeloQuest?",
+        answer:
+          "Your Web3 adventure in game mode! Learn blockchain and the Celo ecosystem through daily challenges, earn XP, unlock achievements, and show your on-chain progress.",
+      },
+      {
+        question: "How do I earn experience?",
+        answer:
+          "Every correct answer counts. Finish the daily challenge, keep your streak alive, and show up each week—the more you play, the more XP you stack and the faster you level up.",
+      },
+      {
+        question: "What are achievements?",
+        answer:
+          "They're your digital trophies: goals like your first challenge, a multi-day streak, or reaching a new level. Each one marks a chapter of your CeloQuest story.",
+      },
+      {
+        question: "How do I claim a medal?",
+        answer:
+          'Once unlocked, it shows up as available in "My achievements". Tap claim and take it to your wallet as an NFT medal.',
+      },
+      {
+        question: "How does the weekly ranking work?",
+        answer:
+          "Every week is a fresh race. Earn XP, climb the leaderboard, and compete for exclusive rewards—top players of the season take home special prizes.",
+      },
+      {
+        question: "What happens if I lose my daily life?",
+        answer:
+          "Don't sit out! Come back tomorrow with a fresh life or recover today's attempt using the in-challenge payment option.",
+      },
+      {
+        question: "When do lives reset?",
+        answer:
+          "You start each day with fresh energy: lives renew automatically so you always get another shot at the challenge.",
+      },
+      {
+        question: "What rewards can I receive?",
+        answer:
+          "In-app badges, on-chain NFT medals, weekly token prizes, and recognition from the community. Play, learn, and turn your progress into real rewards.",
+      },
+      {
+        question: "Where can I see my achievements?",
+        answer:
+          'All in one place: open "My achievements" to see what you\'ve earned, what\'s waiting to be claimed, and how close you are to the next milestone.',
+      },
+    ],
   },
   admin: {
     title: "Admin panel",
@@ -664,7 +795,7 @@ const en: Dict = {
     refillPriceNote: "0.10 per recovery",
     selectPaymentToken: "Payment currency",
     payWithToken: "Pay with {token}",
-    insufficientBalance: "Insufficient balance. You need at least 0.10 of the selected token.",
+    insufficientBalance: "Insufficient balance. You need at least {amount}.",
     yourBalance: "Your balance",
     processingPayment: "Processing payment...",
     waitForReset: "Wait for next reset (UTC)",
@@ -728,6 +859,9 @@ const en: Dict = {
     subtitle: "Achievement NFTs linked to your wallet",
     newUnlocked: "New achievement unlocked!",
     newUnlockedBody: "Claim your on-chain NFT whenever you're ready.",
+    nftHelpAria: "What is an NFT?",
+    nftHelpBody:
+      "NFTs in CeloQuest work as learning medals. Each time you progress, complete challenges, or win a competition, you can earn a digital recognition that represents your progress.",
     available: "Available to claim",
     noAvailable: "No pending achievements. Keep playing to unlock more.",
     claimed: "Claimed NFTs",
@@ -742,6 +876,8 @@ const en: Dict = {
     statusBadge: "Badge",
     statusFailed: "Mint failed",
     viewHistory: "View history and medals",
+    modalClose: "Close",
+    modalDragHint: "Drag to rotate in 3D",
   },
   common: {
     appName: "CeloQuest",

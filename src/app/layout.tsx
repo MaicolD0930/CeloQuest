@@ -35,7 +35,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" className={`${nunito.variable} ${fredoka.variable} h-full antialiased`}>
-      <body className="min-h-dvh">
+      <body className="min-h-dvh bg-h-background">
         <LocaleProvider>
           <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col overflow-x-hidden">
             {children}

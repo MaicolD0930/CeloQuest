@@ -18,6 +18,7 @@ import { ProgressPageSkeleton } from "@/components/skeletons/PageSkeletons";
 import { ProfileMenu } from "@/components/ProfileMenu";
 import { useMe } from "@/hooks/useMe";
 import { resolveAchievementDisplay } from "@/lib/achievements/catalog";
+import { AchievementImageButton } from "@/components/AchievementImageButton";
 import type { QuestionCategory } from "@/lib/questions/categories";
 
 type ProgressResponse = {
@@ -72,7 +73,7 @@ export default function ProgressPage() {
     setError(null);
     setLoading(true);
     try {
-      const progressRes = await fetch("/api/users/progress", {
+      const progressRes = await fetch(`/api/users/progress?locale=${locale}`, {
         credentials: "include",
       });
       if (progressRes.status === 401) {
@@ -89,7 +90,7 @@ export default function ProgressPage() {
     } finally {
       setLoading(false);
     }
-  }, [t.common.error]);
+  }, [locale, t.common.error]);
 
   useEffect(() => {
     load();
@@ -273,7 +274,13 @@ export default function ProgressPage() {
                   key={a.id}
                   className="flex items-start gap-3 rounded-2xl bg-surface p-3 ring-1 ring-h-border"
                 >
-                  <span className="text-2xl">{display.emoji}</span>
+                  <AchievementImageButton
+                    image={display.image}
+                    emoji={display.emoji}
+                    title={display.title}
+                    description={display.description}
+                    size="sm"
+                  />
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold">{display.title}</p>
                     <p className="text-xs text-h-muted">{display.description}</p>

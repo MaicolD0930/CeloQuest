@@ -88,6 +88,8 @@ export function pickAdaptiveQuestions(params: {
   userLevel: number;
   excludeIds?: Set<string>;
   count?: number;
+  /** Varies the daily pick (e.g. per retry) while keeping the same calendar day stable. */
+  seedExtra?: string;
 }): string[] {
   const {
     pool,
@@ -96,17 +98,22 @@ export function pickAdaptiveQuestions(params: {
     userLevel,
     excludeIds = new Set(),
     count = QUESTIONS_PER_DAY,
+    seedExtra = "",
   } = params;
 
   if (pool.length === 0) return [];
+  const seedKey = seedExtra
+    ? `${dateKey}:${userId}:${userLevel}:${seedExtra}`
+    : `${dateKey}:${userId}:${userLevel}`;
+
   if (pool.length <= count) {
-    const rng = mulberry32(hashString(`${dateKey}:${userId}:all`));
+    const rng = mulberry32(hashString(`${seedKey}:all`));
     const shuffled = [...pool];
     shuffleInPlace(shuffled, rng);
     return shuffled.slice(0, count).map((q) => q.id);
   }
 
-  const rng = mulberry32(hashString(`${dateKey}:${userId}:${userLevel}`));
+  const rng = mulberry32(hashString(seedKey));
   const freshPool = pool.filter((q) => !excludeIds.has(q.id));
   const workingPool = freshPool.length >= count ? freshPool : pool;
   const groups = groupByDifficulty(workingPool);

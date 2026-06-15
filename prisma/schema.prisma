@@ -57,6 +57,8 @@ model DailyAttempt {
   date        String
   weekKey     String    @default("")
   questionIds String
+  seenQuestionIds String @default("[]")
+  retryCount      Int    @default(0)
   answers     String    @default("[]")
   livesLeft       Int       @default(1)
   lifeRefillUsed  Boolean   @default(false)

@@ -148,6 +148,14 @@ export const ACHIEVEMENT_CATALOG: Record<AchievementType, AchievementDef> = {
   },
 };
 
+/** Older DB rows may use pre-catalog type strings. */
+const LEGACY_ACHIEVEMENT_ALIASES: Record<string, AchievementType> = {
+  celo_user: "tier_celo_explorer",
+  tier_celo_user: "tier_celo_explorer",
+  blockchain_user: "tier_blockchain_user",
+  tier_blockchain: "tier_blockchain_user",
+};
+
 export const PERSONAL_NFT_TYPES = (
   Object.values(ACHIEVEMENT_CATALOG) as AchievementDef[]
 ).filter((d) => d.claimMode === "manual" && d.tokenId != null);
@@ -157,7 +165,61 @@ export const COMPETITIVE_NFT_TYPES = (
 ).filter((d) => d.claimMode === "auto");
 
 export function getAchievementDef(type: string): AchievementDef | null {
-  return (ACHIEVEMENT_CATALOG as Record<string, AchievementDef>)[type] ?? null;
+  const key = LEGACY_ACHIEVEMENT_ALIASES[type] ?? type;
+  return (ACHIEVEMENT_CATALOG as Record<string, AchievementDef>)[key] ?? null;
+}
+
+function inferLegacyAchievementType(
+  type: string,
+  fallback?: { title: string; description: string }
+): AchievementType | null {
+  if (LEGACY_ACHIEVEMENT_ALIASES[type]) {
+    return LEGACY_ACHIEVEMENT_ALIASES[type];
+  }
+
+  const title = fallback?.title?.toLowerCase() ?? "";
+  const description = fallback?.description?.toLowerCase() ?? "";
+
+  if (
+    title.includes("blockchain user") ||
+    title.includes("usuario blockchain") ||
+    description.includes("usuario blockchain") ||
+    description.includes("blockchain user")
+  ) {
+    return "tier_blockchain_user";
+  }
+
+  // Level-3 tier only when copy explicitly references reaching that tier (not welcome badge).
+  if (
+    description.includes("alcanzaste el nivel") ||
+    description.includes("you reached") ||
+    (description.includes("reached") && description.includes("tier"))
+  ) {
+    if (
+      description.includes("celo explorer") ||
+      description.includes("celo user")
+    ) {
+      return "tier_celo_explorer";
+    }
+  }
+
+  return null;
+}
+
+function resolveWelcomeAccountBadge(
+  locale: Locale,
+  fallback?: { emoji?: string }
+): AchievementDisplay {
+  return {
+    title: locale === "en" ? "Celo Explorer" : "Celo Explorer",
+    description:
+      locale === "en"
+        ? "You created your account on CeloQuest"
+        : "Creaste tu cuenta en CeloQuest",
+    emoji: fallback?.emoji ?? "🌍",
+    image: null,
+    claimMode: "badge",
+  };
 }
 
 export function competitiveTypeForRank(
@@ -193,7 +255,17 @@ export function resolveAchievementDisplay(
   locale: Locale,
   fallback?: { title: string; description: string; emoji?: string }
 ): AchievementDisplay {
-  const def = getAchievementDef(type);
+  if (type === "celo_explorer") {
+    return resolveWelcomeAccountBadge(locale, fallback);
+  }
+
+  const def =
+    getAchievementDef(type) ??
+    (() => {
+      const legacy = inferLegacyAchievementType(type, fallback);
+      return legacy ? getAchievementDef(legacy) : null;
+    })();
+
   if (def) {
     const { title, description } = localizedAchievement(def, locale);
     return {

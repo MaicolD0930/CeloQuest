@@ -8,21 +8,24 @@ import {
   getMasteredCategories,
   countCompletedChallenges,
 } from "@/lib/questions/progress";
-import { getAchievementDef } from "@/lib/achievements/catalog";
+import { getAchievementDef, resolveAchievementDisplay } from "@/lib/achievements/catalog";
+import type { Locale } from "@/lib/i18n/dictionaries";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
+    const url = new URL(req.url);
+    const locale = (url.searchParams.get("locale") === "en" ? "en" : "es") as Locale;
+
     const fresh = await prisma.user.findUnique({ where: { id: user.id } });
     if (!fresh) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    const locale = fresh.locale === "en" ? "en" : "es";
     const levelInfo = computeLevel(fresh.xpTotal, locale);
     const nextTierName = getNextTierName(levelInfo.level, locale);
 
@@ -57,18 +60,24 @@ export async function GET() {
         categoryMastery,
       },
       achievements: achievements.map((a) => {
+        const display = resolveAchievementDisplay(a.type, locale, {
+          title: a.title,
+          description: a.description,
+          emoji: a.emoji,
+        });
         const def = getAchievementDef(a.type);
         return {
           id: a.id,
           type: a.type,
-          title: a.title,
-          description: a.description,
-          emoji: a.emoji,
+          title: display.title,
+          description: display.description,
+          emoji: display.emoji,
+          image: display.image,
           status: a.status,
           claimable:
             a.status === "pending" &&
-            def?.claimMode === "manual" &&
-            def.tokenId != null,
+            display.claimMode === "manual" &&
+            def?.tokenId != null,
           nftTokenId: a.nftTokenId,
           createdAt: a.createdAt,
         };

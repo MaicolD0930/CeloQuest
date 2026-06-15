@@ -243,6 +243,9 @@ body {
 /* Home / Perfil (Lovable) utilities */
 .home-perfil {
   background-color: var(--color-h-background);
+  background-image:
+    radial-gradient(ellipse at top, oklch(0.78 0.16 85 / 0.08), transparent 50%),
+    radial-gradient(ellipse at bottom, oklch(0.78 0.18 145 / 0.06), transparent 50%);
   color: var(--color-h-foreground);
   font-family: var(--font-display);
 }
@@ -278,17 +281,20 @@ body {
   padding-top: calc(env(safe-area-inset-top, 0px) + 1.75rem);
 }
 
-/* Landing page (index) — same perfil palette as /home */
+/* Landing page (index) */
 .landing-page {
-  background-color: var(--color-h-background);
-  background-image: radial-gradient(
-    ellipse at 50% -15%,
-    oklch(0.74 0.18 150 / 14%) 0%,
-    oklch(0.9 0.18 100 / 10%) 40%,
-    transparent 72%
-  );
   color: var(--color-h-foreground);
   font-family: var(--font-display);
+}
+
+@keyframes octofloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
 }
 
 @keyframes landing-blob {
@@ -372,6 +378,101 @@ body {
     transform: translateY(3px);
     box-shadow: 0 2px 0 0 oklch(0 0 0 / 0.32);
   }
+}
+
+/* Leaderboard (Perfil / Lovable) */
+.leaderboard-page {
+  --lb-gold: oklch(0.82 0.17 85);
+  --lb-silver: oklch(0.82 0.02 250);
+  --lb-bronze: oklch(0.65 0.13 55);
+  --lb-gradient-gold: linear-gradient(
+    180deg,
+    oklch(0.88 0.17 85) 0%,
+    oklch(0.65 0.16 70) 100%
+  );
+  --lb-gradient-silver: linear-gradient(
+    180deg,
+    oklch(0.88 0.02 250) 0%,
+    oklch(0.6 0.02 250) 100%
+  );
+  --lb-gradient-bronze: linear-gradient(
+    180deg,
+    oklch(0.72 0.14 55) 0%,
+    oklch(0.5 0.12 45) 100%
+  );
+  --lb-gradient-podium-1: linear-gradient(
+    180deg,
+    oklch(0.55 0.17 145 / 0.85),
+    oklch(0.35 0.12 145 / 0.6)
+  );
+  --lb-gradient-podium-2: linear-gradient(
+    180deg,
+    oklch(0.45 0.12 145 / 0.7),
+    oklch(0.3 0.08 145 / 0.5)
+  );
+  --lb-gradient-podium-3: linear-gradient(
+    180deg,
+    oklch(0.4 0.1 145 / 0.65),
+    oklch(0.28 0.07 145 / 0.45)
+  );
+  --lb-shadow-you: 0 0 0 2px oklch(0.78 0.16 85 / 0.7),
+    0 0 24px oklch(0.78 0.16 85 / 0.3);
+}
+
+@keyframes lb-rise {
+  0% {
+    transform: translateY(20px) scaleY(0.6);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0) scaleY(1);
+    opacity: 1;
+  }
+}
+
+@keyframes lb-pulse-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 24px oklch(0.82 0.17 85 / 0.5),
+      0 0 0 1px oklch(0.82 0.17 85 / 0.4);
+  }
+  50% {
+    box-shadow:
+      0 0 40px oklch(0.82 0.17 85 / 0.7),
+      0 0 0 1px oklch(0.82 0.17 85 / 0.6);
+  }
+}
+
+@keyframes lb-shimmer-bg {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@utility leaderboard-rise {
+  animation: lb-rise 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@utility leaderboard-pulse-glow {
+  animation: lb-pulse-glow 2.4s ease-in-out infinite;
+}
+
+@utility leaderboard-shimmer-text {
+  background: linear-gradient(
+    90deg,
+    oklch(0.82 0.17 85) 0%,
+    oklch(0.95 0.1 95) 50%,
+    oklch(0.82 0.17 85) 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: lb-shimmer-bg 3s linear infinite;
 }
 
 /* Tutorial videos — mobile-first 9:16 frame */

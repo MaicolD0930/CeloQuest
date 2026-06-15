@@ -20,6 +20,7 @@ import { formatDurationMs } from "@/lib/format";
 import { useMe } from "@/hooks/useMe";
 import { resolveAchievementDisplay } from "@/lib/achievements/catalog";
 import { AchievementSeasonLabel } from "@/components/AchievementSeasonLabel";
+import { AchievementImageButton } from "@/components/AchievementImageButton";
 
 type Achievement = {
   id: string;
@@ -229,9 +230,13 @@ export default function MedalsPage() {
                   className="animate-card-pop flex items-center gap-3 rounded-2xl bg-surface px-4 py-3 ring-1 ring-h-border card-depth-sm"
                   style={{ animationDelay: `${200 + i * 40}ms` }}
                 >
-                  <div className="grid size-12 shrink-0 place-items-center rounded-xl bg-h-background text-2xl ring-1 ring-h-border">
-                    {display.emoji}
-                  </div>
+                  <AchievementImageButton
+                    image={display.image}
+                    emoji={display.emoji}
+                    title={display.title}
+                    description={display.description}
+                    size="sm"
+                  />
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-display font-bold text-h-foreground">
                       {display.title}
