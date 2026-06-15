@@ -114,7 +114,8 @@ export function normalizeRecoveryTokenParam(
   return getCopmTokenConfig().id;
 }
 
-/** Only enabled when explicitly set — must use NEXT_PUBLIC_ for client bundles. */
+/** Only enabled when explicitly set — never in production. */
 export const RECOVERY_DEMO_MODE =
+  process.env.NODE_ENV !== "production" &&
   (process.env.NEXT_PUBLIC_RECOVERY_DEMO_MODE ??
     process.env.RECOVERY_DEMO_MODE) === "true";
