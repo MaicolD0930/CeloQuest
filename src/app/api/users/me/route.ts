@@ -10,9 +10,10 @@ import {
   weekKey,
   type AnswerRecord,
 } from "@/lib/game";
+import { getNextTierName } from "@/lib/questions/levels";
 import { allowDailyChallengeRetry } from "@/lib/dev-flags";
 import { isCurrentUserAdmin } from "@/lib/admin/auth";
-import { safeSeasonSync, ensureActiveSeason } from "@/lib/seasons";
+import { maybeAwardMilestoneAchievements } from "@/lib/achievements";
 
 export async function GET() {
   try {
@@ -20,8 +21,6 @@ export async function GET() {
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
-
-    await safeSeasonSync(user.id);
 
     const fresh = await prisma.user.findUnique({ where: { id: user.id } });
     if (!fresh) {
@@ -44,18 +43,27 @@ export async function GET() {
     let season = null;
     try {
       if ("weeklySeason" in prisma) {
-        season = await ensureActiveSeason();
+        season = await prisma.weeklySeason.findFirst({
+          where: { status: "active" },
+          orderBy: { startDate: "desc" },
+        });
       }
     } catch (e) {
       console.error("Season lookup failed:", e);
     }
 
     const isAdmin = await isCurrentUserAdmin();
+    const locale = fresh.locale === "en" ? "en" : "es";
+    await maybeAwardMilestoneAchievements(fresh.id, fresh.xpTotal, locale);
+    const levelInfo = computeLevel(fresh.xpTotal, locale);
 
     return NextResponse.json({
       user: fresh,
       isAdmin,
-      levelInfo: computeLevel(fresh.xpTotal),
+      levelInfo: {
+        ...levelInfo,
+        nextTierName: getNextTierName(levelInfo.level, locale),
+      },
       season: season
         ? {
             weekKey: season.weekKey,

@@ -4,21 +4,37 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { User, Zap, Trophy, Medal } from "lucide-react";
 import { useLocale } from "@/lib/i18n/LocaleProvider";
+import { prefetchChallengeToday } from "@/lib/client/challenge-cache";
 
 type Props = {
   variant?: "default" | "perfil";
 };
 
+const PREFETCH_ROUTES = ["/home", "/challenge", "/leaderboard", "/achievements"];
+
 export function BottomNav({ variant = "default" }: Props) {
   const pathname = usePathname();
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
 
   const items = [
     { href: "/home", icon: User, label: t.home.profile },
     { href: "/challenge", icon: Zap, label: t.home.playTab },
     { href: "/leaderboard", icon: Trophy, label: t.home.ranking },
-    { href: "/medals", icon: Medal, label: t.medals.tab },
+    { href: "/achievements", icon: Medal, label: t.achievements.tab },
   ];
+
+  function prefetchRouteData(href: string) {
+    if (href === pathname) return;
+    if (href === "/home" || href === "/leaderboard" || href === "/achievements") {
+      void import("@/lib/client/me-cache").then(({ fetchMe }) => fetchMe());
+    }
+    if (href === "/leaderboard") {
+      void fetch("/api/leaderboard?period=weekly", { credentials: "include" });
+    }
+    if (href === "/challenge") {
+      prefetchChallengeToday(locale);
+    }
+  }
 
   if (variant === "perfil") {
     return (
@@ -30,6 +46,10 @@ export function BottomNav({ variant = "default" }: Props) {
               <Link
                 key={href}
                 href={href}
+                prefetch={PREFETCH_ROUTES.includes(href)}
+                onMouseEnter={() => prefetchRouteData(href)}
+                onFocus={() => prefetchRouteData(href)}
+                onTouchStart={() => prefetchRouteData(href)}
                 className="flex flex-col items-center gap-1 transition-transform active:scale-90"
               >
                 <span
@@ -66,6 +86,10 @@ export function BottomNav({ variant = "default" }: Props) {
             <Link
               key={item.href}
               href={item.href}
+              prefetch={PREFETCH_ROUTES.includes(item.href)}
+              onMouseEnter={() => prefetchRouteData(item.href)}
+              onFocus={() => prefetchRouteData(item.href)}
+              onTouchStart={() => prefetchRouteData(item.href)}
               className={`flex flex-1 flex-col items-center gap-0.5 py-3 transition-colors ${
                 active ? "text-celo-green" : "text-celo-black/40"
               }`}

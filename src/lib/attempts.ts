@@ -6,7 +6,10 @@ import {
   yesterdayKey,
   type AnswerRecord,
 } from "@/lib/game";
-import { maybeAwardMilestoneAchievements } from "@/lib/achievements";
+import {
+  maybeAwardMilestoneAchievements,
+  maybeAwardLearningAchievements,
+} from "@/lib/achievements";
 import { capAttemptDurationMs, getAttemptElapsedMs } from "@/lib/challenge-timer";
 import { addWeeklyDurationMs } from "@/lib/weekly-duration";
 import { ensureActiveSeason } from "@/lib/seasons";
@@ -39,6 +42,17 @@ export async function finalizeDailyAttempt(
   const lastKey = user.lastPlayedAt ? todayKey(new Date(user.lastPlayedAt)) : null;
   const streak = lastKey === yesterdayKey() ? user.streak + 1 : 1;
 
+  const priorCompleted = await prisma.dailyAttempt.count({
+    where: {
+      userId: user.id,
+      completedAt: { not: null },
+      result: "completed",
+      id: { not: attempt.id },
+    },
+  });
+  const isFirstCompletedChallenge = priorCompleted === 0 && result === "completed";
+  const xpGain = attempt.xpEarned;
+
   const freshUser = await prisma.user.findUnique({ where: { id: user.id } });
   const activeSeason = await ensureActiveSeason();
   const wKey = activeSeason?.weekKey ?? weekKey();
@@ -60,8 +74,8 @@ export async function finalizeDailyAttempt(
   await prisma.user.update({
     where: { id: user.id },
     data: {
-      xpTotal: user.xpTotal + attempt.xpEarned,
-      weeklyXp: weeklyXpBase + attempt.xpEarned,
+      xpTotal: user.xpTotal + xpGain,
+      weeklyXp: weeklyXpBase + xpGain,
       weeklyDurationMs,
       currentWeekKey: wKey,
       streak,
@@ -69,10 +83,12 @@ export async function finalizeDailyAttempt(
     },
   });
 
-  await maybeAwardMilestoneAchievements(
-    user.id,
-    user.xpTotal + attempt.xpEarned
-  );
+  const newXpTotal = user.xpTotal + xpGain;
+  await maybeAwardMilestoneAchievements(user.id, newXpTotal);
+  await maybeAwardLearningAchievements(user.id, {
+    isFirstChallenge: isFirstCompletedChallenge,
+    streak,
+  });
 
   return {
     attempt: updated,

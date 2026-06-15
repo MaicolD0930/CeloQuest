@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Menu, Shield } from "lucide-react";
+import { Menu, Shield, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n/LocaleProvider";
@@ -95,6 +95,15 @@ export function ProfileMenu({
               {shortWallet}
             </p>
           </div>
+
+          <Link
+            href="/progress"
+            onClick={() => setOpen(false)}
+            className={`${itemClass} text-lemon hover:bg-lemon/10`}
+          >
+            <TrendingUp className="size-4" />
+            {t.home.myProgress}
+          </Link>
 
           {isAdmin ? (
             <Link

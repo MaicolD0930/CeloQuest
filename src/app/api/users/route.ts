@@ -80,6 +80,9 @@ export async function POST(req: NextRequest) {
     },
   });
 
+  const { maybeAwardFirstWallet } = await import("@/lib/achievements");
+  await maybeAwardFirstWallet(user.id, locale);
+
   const res = NextResponse.json({ user, returning: false }, { status: 201 });
   setUserCookie(res, user.id);
   return res;

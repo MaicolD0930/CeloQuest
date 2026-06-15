@@ -20,8 +20,16 @@ import {
 import { useLocale } from "@/lib/i18n/LocaleProvider";
 import { BottomNav } from "@/components/BottomNav";
 import { ChallengeCompletedCard } from "@/components/ChallengeCompletedCard";
-import { LoadingOctopus } from "@/components/LoadingOctopus";
+import { CategoryBadge } from "@/components/CategoryBadge";
+import { ChallengeSkeleton } from "@/components/skeletons/PageSkeletons";
 import { formatDurationMs, formatTimerLive } from "@/lib/format";
+import { invalidateMeCache } from "@/lib/client/me-cache";
+import {
+  fetchChallengeToday,
+  invalidateChallengeCache,
+  peekChallengeCache,
+  type ChallengeTodayResponse,
+} from "@/lib/client/challenge-cache";
 import { WalletPicker } from "@/components/WalletPicker";
 import {
   sendRecoveryPayment,
@@ -38,6 +46,7 @@ import { LIVES_PER_DAY } from "@/lib/game";
 type Question = {
   id: string;
   category: string;
+  difficulty?: number;
   text: string;
   options: string[];
 };
@@ -134,26 +143,7 @@ export default function ChallengePage() {
     };
   }, [awaitingRefill, selectedToken]);
 
-  async function loadChallenge() {
-    setLoadError(null);
-    const res = await fetch(`/api/challenge/today?locale=${locale}`, {
-      credentials: "include",
-    });
-
-    if (res.status === 401) {
-      window.location.assign("/connect");
-      return;
-    }
-
-    const data = await res.json().catch(() => null);
-    if (!res.ok || !data) {
-      setLoadError(t.common.error);
-      return;
-    }
-    if (data.error && !data.questions) {
-      setLoadError(t.common.error);
-      return;
-    }
+  async function applyChallengeData(data: ChallengeTodayResponse) {
     if (data.progress?.completed) {
       setXpEarned(data.progress.xpEarned ?? 0);
       setAlreadyDone(true);
@@ -166,53 +156,89 @@ export default function ChallengePage() {
 
     const answers: AnswerRecord[] = data.progress.answers;
     setQuestions(data.questions);
-    setCurrentIndex(answers.length);
+    const safeIndex =
+      data.questions.length === 0
+        ? 0
+        : Math.min(answers.length, data.questions.length - 1);
+    setCurrentIndex(safeIndex);
     setLivesLeft(data.progress.livesLeft);
     setXpEarned(data.progress.xpEarned);
-    setAwaitingRefill(data.progress.awaitingRefill);
-    setCanRefill(data.progress.canRefill);
+    setAwaitingRefill(!!data.progress.awaitingRefill);
+    setCanRefill(!!data.progress.canRefill);
     if (data.progress.startedAt) setStartedAt(data.progress.startedAt);
     setDurationOffset(data.progress.activeDurationMs ?? 0);
-    setTimerPaused(data.progress.timerPaused ?? false);
+    setTimerPaused(!!data.progress.timerPaused);
     if (answers.length > 0) setIntroDismissed(true);
+  }
 
-    const apiTokens = data.recovery?.tokens;
-    if (Array.isArray(apiTokens) && apiTokens.length > 0) {
-      const ids = apiTokens
-        .map((t: { id?: string; priceDisplay?: string } | string) =>
-          typeof t === "string" ? t : t.id
-        )
-        .filter(Boolean) as RecoveryToken[];
-      const labels: Record<string, string> = {};
-      for (const t of apiTokens) {
-        if (typeof t === "object" && t?.id && t?.priceDisplay) {
-          labels[t.id] = t.priceDisplay;
+  async function loadChallenge(force = false) {
+    setLoadError(null);
+    try {
+      const data = await fetchChallengeToday(locale, { force });
+      await applyChallengeData(data);
+    } catch (e) {
+      const err = e as Error & { status?: number };
+      if (err.status === 401) {
+        window.location.assign("/connect");
+        return;
+      }
+      setLoadError(t.common.error);
+    }
+  }
+
+  async function loadRecoveryMeta() {
+    try {
+      const res = await fetch("/api/challenge/recovery", {
+        credentials: "include",
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      const apiTokens = data.tokens;
+      if (Array.isArray(apiTokens) && apiTokens.length > 0) {
+        const ids = apiTokens
+          .map((t: { id?: string; priceDisplay?: string } | string) =>
+            typeof t === "string" ? t : t.id
+          )
+          .filter(Boolean) as RecoveryToken[];
+        const labels: Record<string, string> = {};
+        for (const t of apiTokens) {
+          if (typeof t === "object" && t?.id && t?.priceDisplay) {
+            labels[t.id] = t.priceDisplay;
+          }
+        }
+        if (Object.keys(labels).length > 0) setTokenPriceLabels(labels);
+        if (ids.length > 0) {
+          setRecoveryTokens(ids);
+          setSelectedToken(ids[0]);
         }
       }
-      if (Object.keys(labels).length > 0) setTokenPriceLabels(labels);
-      if (ids.length > 0) {
-        setRecoveryTokens(ids);
-        setSelectedToken(ids[0]);
+      if (typeof data.priceUsd === "number") {
+        setRecoveryPriceUsd(data.priceUsd);
       }
-    }
-    if (typeof data.recovery?.priceUsd === "number") {
-      setRecoveryPriceUsd(data.recovery.priceUsd);
-    }
-    if (typeof data.recovery?.copPerUsd === "string") {
-      setCopPerUsd(data.recovery.copPerUsd);
+      if (typeof data.copPerUsd === "string") {
+        setCopPerUsd(data.copPerUsd);
+      }
+    } catch {
+      /* recovery meta is optional until refill screen */
     }
   }
 
   useEffect(() => {
-    let cancelled = false;
-    loadChallenge()
+    if (!awaitingRefill) return;
+    void loadRecoveryMeta();
+  }, [awaitingRefill]);
+
+  useEffect(() => {
+    const cached = peekChallengeCache(locale);
+    if (cached) {
+      void applyChallengeData(cached);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+    void loadChallenge()
       .catch(() => setLoadError(t.common.error))
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
+      .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [locale]);
 
@@ -288,6 +314,7 @@ export default function ChallengePage() {
         if (res.status === 409) await syncProgress();
         return;
       }
+      invalidateChallengeCache();
       setFeedback({
         correct: data.correct,
         correctIndex: data.correctIndex,
@@ -296,6 +323,8 @@ export default function ChallengePage() {
       setLivesLeft(data.livesLeft);
       setXpEarned(data.xpEarned);
       if (data.summary) {
+        invalidateMeCache();
+        invalidateChallengeCache();
         setSummary(data.summary);
         if (data.summary.durationMs != null) {
           setDurationOffset(data.summary.durationMs);
@@ -323,20 +352,8 @@ export default function ChallengePage() {
   }
 
   async function syncProgress() {
-    const res = await fetch(`/api/challenge/today?locale=${locale}`, {
-      credentials: "include",
-    });
-    if (!res.ok) return;
-    const data = await res.json();
-    const answers: AnswerRecord[] = data.progress?.answers ?? [];
-    setCurrentIndex(answers.length);
-    setLivesLeft(data.progress.livesLeft);
-    setXpEarned(data.progress.xpEarned);
-    setAwaitingRefill(data.progress.awaitingRefill ?? false);
-    setCanRefill(data.progress.canRefill ?? false);
-    if (data.progress.startedAt) setStartedAt(data.progress.startedAt);
-    setDurationOffset(data.progress.activeDurationMs ?? 0);
-    setTimerPaused(data.progress.timerPaused ?? false);
+    invalidateChallengeCache();
+    await loadChallenge(true);
   }
 
   function handleNext() {
@@ -462,6 +479,7 @@ export default function ChallengePage() {
       const res = await fetch("/api/challenge/forfeit", { method: "POST" });
       const data = await res.json();
       if (res.ok && data.summary) {
+        invalidateMeCache();
         setSummary({
           ...data.summary,
           totalQuestions: questions.length,
@@ -480,9 +498,8 @@ export default function ChallengePage() {
   if (loading) {
     return (
       <ChallengeShell>
-        <CenterScreen>
-          <LoadingOctopus label={t.challenge.loading} />
-        </CenterScreen>
+        <ChallengeSkeleton />
+        <BottomNav variant="perfil" />
       </ChallengeShell>
     );
   }
@@ -499,7 +516,7 @@ export default function ChallengePage() {
             type="button"
             onClick={() => {
               setLoading(true);
-              loadChallenge()
+              loadChallenge(true)
                 .catch(() => setLoadError(t.common.error))
                 .finally(() => setLoading(false));
             }}
@@ -632,6 +649,7 @@ export default function ChallengePage() {
             timeLabel={t.challenge.timeTaken}
             rankingLabel={t.challenge.seeRanking}
             homeLabel={t.challenge.backHome}
+            progressLabel={t.home.myProgress}
           />
         </main>
         <BottomNav variant="perfil" />
@@ -639,13 +657,29 @@ export default function ChallengePage() {
     );
   }
 
-  if (!question) {
+  if (!question && !loading && !loadError) {
     return (
       <ChallengeShell>
         <CenterScreen>
-          <Zap className="size-12 animate-bounce-soft text-prosperity" />
-          <p className="mt-4 text-h-muted">{t.challenge.loading}</p>
+          <XCircle className="size-16 text-danger" />
+          <p className="mt-4 font-display text-lg font-semibold text-h-foreground">
+            {t.challenge.loadError}
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setLoadError(null);
+              setLoading(true);
+              loadChallenge(true)
+                .catch(() => setLoadError(t.common.error))
+                .finally(() => setLoading(false));
+            }}
+            className="btn-chunky mt-6 rounded-2xl bg-prosperity px-8 py-4 font-display text-base font-bold text-h-background"
+          >
+            {t.common.retry}
+          </button>
         </CenterScreen>
+        <BottomNav variant="perfil" />
       </ChallengeShell>
     );
   }
@@ -700,10 +734,18 @@ export default function ChallengePage() {
           className="shrink-0 animate-card-pop"
           style={{ animationDelay: "80ms" }}
         >
-          <span className="inline-block rounded-full bg-prosperity/20 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-prosperity">
-            {t.challenge.question} {currentIndex + 1} {t.challenge.of}{" "}
-            {questions.length}
-          </span>
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <span className="inline-block rounded-full bg-prosperity/20 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-prosperity">
+              {t.challenge.question} {currentIndex + 1} {t.challenge.of}{" "}
+              {questions.length}
+            </span>
+            <CategoryBadge category={question.category} />
+            {question.difficulty && (
+              <span className="rounded-full bg-h-background px-2 py-0.5 text-[10px] font-bold text-h-muted ring-1 ring-h-border">
+                {t.challenge.difficultyLabel} {question.difficulty}
+              </span>
+            )}
+          </div>
           <h2 className="mt-3 font-display text-2xl font-bold leading-snug text-h-foreground">
             {question.text}
           </h2>
@@ -944,6 +986,7 @@ function SummaryScreen({
   timeLabel,
   rankingLabel,
   homeLabel,
+  progressLabel,
 }: {
   headline: string;
   sub: string;
@@ -959,6 +1002,7 @@ function SummaryScreen({
   timeLabel: string;
   rankingLabel: string;
   homeLabel: string;
+  progressLabel: string;
 }) {
   return (
     <div className="flex flex-1 flex-col">
@@ -1033,6 +1077,12 @@ function SummaryScreen({
         className="flex flex-col gap-3 animate-card-pop"
         style={{ animationDelay: "340ms" }}
       >
+        <Link
+          href="/progress"
+          className="flex items-center justify-center gap-2 rounded-2xl bg-prosperity/15 py-3 font-display text-sm font-semibold text-prosperity ring-1 ring-prosperity/30"
+        >
+          {progressLabel}
+        </Link>
         <Link
           href="/leaderboard"
           className="btn-chunky flex items-center justify-center gap-2 rounded-2xl bg-lemon py-4 font-display text-base font-bold text-h-background"

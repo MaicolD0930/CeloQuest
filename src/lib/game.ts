@@ -7,29 +7,13 @@ export const MAX_DAILY_XP = 10;
 /** Base life recovery price: $0.10 USD (see pricing/recovery-price.ts). */
 export const RECOVERY_PRICE_USD_CENTS = 10;
 
-// Level thresholds by total XP. Extensible: add more entries.
-export const LEVELS: { level: number; minXp: number }[] = [
-  { level: 1, minXp: 0 },
-  { level: 2, minXp: 50 },
-  { level: 3, minXp: 150 },
-];
-
-export function computeLevel(xpTotal: number): {
-  level: number;
-  nextLevelXp: number | null;
-  progress: number;
-} {
-  let current = LEVELS[0];
-  for (const l of LEVELS) {
-    if (xpTotal >= l.minXp) current = l;
-  }
-  const next = LEVELS.find((l) => l.minXp > xpTotal) ?? null;
-  const base = current.minXp;
-  const progress = next
-    ? Math.min(1, (xpTotal - base) / (next.minXp - base))
-    : 1;
-  return { level: current.level, nextLevelXp: next?.minXp ?? null, progress };
-}
+export {
+  LEARNING_TIERS as LEVELS,
+  computeLearningLevel as computeLevel,
+  getNextTierName,
+  getTierName,
+  type LearningLevelInfo,
+} from "@/lib/questions/levels";
 
 /** YYYY-MM-DD in UTC, used as the daily challenge key. */
 export function todayKey(date: Date = new Date()): string {
@@ -106,7 +90,7 @@ function mulberry32(seed: number): () => number {
   };
 }
 
-/** Deterministically pick `count` question ids for a user+date. */
+/** @deprecated Use pickAdaptiveQuestions from @/lib/questions/picker */
 export function pickDailyQuestions(
   allIds: string[],
   userId: string,

@@ -18,10 +18,12 @@ import {
 import { getCopmTokenConfig, getUsdcTokenConfig } from "@/lib/tokens/recovery";
 import { useLocale } from "@/lib/i18n/LocaleProvider";
 import { LanguageToggle } from "@/components/LanguageToggle";
-import { LoadingOctopus } from "@/components/LoadingOctopus";
+import { HomePageSkeleton } from "@/components/skeletons/PageSkeletons";
 import { BottomNav } from "@/components/BottomNav";
 import { ProfileMenu } from "@/components/ProfileMenu";
 import { ChallengeCompletedCard } from "@/components/ChallengeCompletedCard";
+import { useMe } from "@/hooks/useMe";
+import { prefetchChallengeToday } from "@/lib/client/challenge-cache";
 
 type WalletBalanceCell = {
   configured: boolean;
@@ -35,52 +37,22 @@ type BalancesResponse = {
   usdc: WalletBalanceCell;
 };
 
-type MeResponse = {
-  isAdmin?: boolean;
-  user: {
-    id: string;
-    username: string;
-    avatar: string;
-    xpTotal: number;
-    weeklyXp: number;
-    streak: number;
-    walletAddress: string;
-  };
-  levelInfo: { level: number; nextLevelXp: number | null; progress: number };
-  season: { weekKey: string; startDate: string; endDate: string } | null;
-  today: {
-    started: boolean;
-    completed: boolean;
-    answeredCount: number;
-    totalQuestions: number;
-    livesLeft: number;
-    xpEarned: number;
-    awaitingRefill?: boolean;
-    result?: string | null;
-  };
-  weekly: { xp: number; endsAt: string };
-};
-
 export default function HomePage() {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const router = useRouter();
-  const [data, setData] = useState<MeResponse | null>(null);
+  const { data, loading } = useMe({
+    onUnauthorized: () => router.replace("/connect"),
+  });
   const [balances, setBalances] = useState<BalancesResponse | null>(null);
   const [balancesLoading, setBalancesLoading] = useState(false);
   const copmToken = getCopmTokenConfig();
   const usdcToken = getUsdcTokenConfig();
 
   useEffect(() => {
-    fetch("/api/users/me", { credentials: "include" })
-      .then(async (r) => {
-        if (!r.ok) {
-          router.replace("/connect");
-          return;
-        }
-        setData(await r.json());
-      })
-      .catch(() => router.replace("/connect"));
-  }, [router]);
+    if (!data?.today.completed) {
+      prefetchChallengeToday(locale);
+    }
+  }, [data?.today.completed, locale]);
 
   useEffect(() => {
     if (!data?.user.walletAddress) return;
@@ -122,16 +94,19 @@ export default function HomePage() {
     };
   }, [data?.user.walletAddress, copmToken.symbol, usdcToken.symbol]);
 
-  if (!data) {
+  if (loading || !data) {
     return (
-      <main className="home-perfil flex flex-1 items-center justify-center">
-        <LoadingOctopus />
-      </main>
+      <>
+        <HomePageSkeleton />
+        <BottomNav variant="perfil" />
+      </>
     );
   }
 
   const { user, levelInfo, today, weekly } = data;
-  const levelName = t.levels[levelInfo.level] ?? `Level ${levelInfo.level}`;
+  const levelName =
+    levelInfo.name ?? t.levels[levelInfo.level] ?? `Level ${levelInfo.level}`;
+  const levelEmoji = levelInfo.emoji ?? "🌱";
   const challengeDone = today.completed;
   const inProgress = today.started && !today.completed && today.answeredCount > 0;
   const needsRefill = today.awaitingRefill;
@@ -196,7 +171,7 @@ export default function HomePage() {
             )}
             <div className="min-w-0 flex-1">
               <span className="inline-block rounded-full bg-lemon px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-h-background">
-                {t.home.level} {levelInfo.level}
+                {levelEmoji} {t.home.level} {levelInfo.level}
               </span>
               <h2
                 className={`truncate font-display font-semibold ${
@@ -205,7 +180,18 @@ export default function HomePage() {
               >
                 {levelName}
               </h2>
+              {levelInfo.nextTierName && levelInfo.nextLevelXp && (
+                <p className="mt-0.5 truncate text-[11px] text-h-muted">
+                  {t.home.nextLevelPreview}: {levelInfo.nextTierName}
+                </p>
+              )}
             </div>
+            <Link
+              href="/progress"
+              className="shrink-0 rounded-xl bg-h-background px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-prosperity ring-1 ring-h-border transition-transform active:scale-95"
+            >
+              {t.home.myProgress}
+            </Link>
           </div>
           <div className={compactLayout ? "mt-2.5" : "mt-4"}>
             <div

@@ -3,25 +3,17 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/session";
 import {
   LIVES_PER_DAY,
-  pickDailyQuestions,
   todayKey,
   weekKey,
   type AnswerRecord,
 } from "@/lib/game";
+import { buildDailyQuestionIds } from "@/lib/questions/daily";
 import { safeSeasonSync } from "@/lib/seasons";
 import {
   getAttemptElapsedMs,
-  pauseAttemptElapsedMs,
   resumeAttemptTimerSegment,
 } from "@/lib/challenge-timer";
-import { getAvailableRecoveryTokens } from "@/lib/tokens/recovery";
-import {
-  getRecoveryPricingMetaAsync,
-  formatRecoveryPriceFromAtomic,
-  getRecoveryPriceAtomicAsync,
-} from "@/lib/pricing/recovery-price";
-import { readRecoveryPriceForTokenId } from "@/lib/contracts/recovery-payment";
-import { maybeResetCompletedAttempt } from "@/lib/challenge-retry";
+import { maybeResetCompletedAttempt, repairDailyAttempt } from "@/lib/challenge-retry";
 
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
@@ -40,15 +32,11 @@ export async function GET(req: NextRequest) {
   });
 
   if (!attempt) {
-    const all = await prisma.question.findMany({
-      select: { id: true },
-      orderBy: { id: "asc" },
+    const ids = await buildDailyQuestionIds({
+      userId: user.id,
+      xpTotal: user.xpTotal,
+      dateKey: date,
     });
-    const ids = pickDailyQuestions(
-      all.map((q) => q.id),
-      user.id,
-      date
-    );
     attempt = await prisma.dailyAttempt.create({
       data: {
         userId: user.id,
@@ -60,20 +48,28 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  attempt = await maybeResetCompletedAttempt(attempt);
+  attempt = await maybeResetCompletedAttempt(attempt, user);
+  attempt = await repairDailyAttempt(attempt, user);
 
   if (
     attempt.result === "in_progress" &&
     !attempt.completedAt
   ) {
     const segment = resumeAttemptTimerSegment(attempt);
-    attempt = await prisma.dailyAttempt.update({
-      where: { id: attempt.id },
-      data: {
-        startedAt: segment.startedAt,
-        durationMs: segment.durationMs,
-      },
-    });
+    attempt = {
+      ...attempt,
+      startedAt: segment.startedAt,
+      durationMs: segment.durationMs,
+    };
+    void prisma.dailyAttempt
+      .update({
+        where: { id: attempt.id },
+        data: {
+          startedAt: segment.startedAt,
+          durationMs: segment.durationMs,
+        },
+      })
+      .catch((err) => console.error("[challenge/today] timer persist:", err));
   }
 
   const questionIds: string[] = JSON.parse(attempt.questionIds);
@@ -92,6 +88,7 @@ export async function GET(req: NextRequest) {
       return {
         id: q.id,
         category: q.category,
+        difficulty: q.difficulty,
         text: tr?.text ?? "",
         options: tr ? (JSON.parse(tr.options) as string[]) : [],
       };
@@ -103,22 +100,6 @@ export async function GET(req: NextRequest) {
     attempt.result === "awaiting_refill" && !attempt.completedAt;
   const canRefill =
     awaitingRefill && !attempt.lifeRefillUsed;
-
-  const pricing = await getRecoveryPricingMetaAsync();
-  const recoveryTokens = getAvailableRecoveryTokens();
-  const tokens = await Promise.all(
-    recoveryTokens.map(async (t) => {
-      const atomic =
-        t.address != null
-          ? await readRecoveryPriceForTokenId(t.id, t.address)
-          : await getRecoveryPriceAtomicAsync(t.id);
-      return {
-        id: t.id,
-        symbol: t.symbol,
-        priceDisplay: formatRecoveryPriceFromAtomic(t.id, atomic),
-      };
-    })
-  );
 
   return NextResponse.json({
     date,
@@ -136,11 +117,6 @@ export async function GET(req: NextRequest) {
       activeDurationMs: attempt.durationMs ?? 0,
       elapsedMs: getAttemptElapsedMs(attempt),
       timerPaused: awaitingRefill,
-    },
-    recovery: {
-      ...pricing,
-      maxRefillsPerDay: 1,
-      tokens,
     },
   });
 }

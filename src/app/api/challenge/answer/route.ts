@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
     if (!allowDailyChallengeRetry()) {
       return NextResponse.json({ error: "Challenge already completed" }, { status: 409 });
     }
-    attempt = await maybeResetCompletedAttempt(attempt);
+    attempt = await maybeResetCompletedAttempt(attempt, user);
   }
   if (attempt.livesLeft <= 0 && attempt.result === "awaiting_refill") {
     return NextResponse.json({ error: "Awaiting life refill" }, { status: 409 });
@@ -74,6 +74,11 @@ export async function POST(req: NextRequest) {
     ? Math.min(XP_PER_CORRECT, MAX_DAILY_XP - attempt.xpEarned)
     : 0;
   const livesLeft = correct ? attempt.livesLeft : attempt.livesLeft - 1;
+
+  if (correct && question.category === "celo") {
+    const { maybeAwardFirstCeloLearning } = await import("@/lib/achievements");
+    await maybeAwardFirstCeloLearning(user.id, locale);
+  }
 
   answers.push({ questionId, answerIndex, correct });
 
@@ -137,7 +142,7 @@ export async function POST(req: NextRequest) {
     );
     streak = finalized.streak;
     summary = {
-      xpEarned: updatedAttempt.xpEarned,
+      xpEarned: finalized.attempt.xpEarned,
       correctCount: finalized.correctCount,
       totalAnswered: finalized.totalAnswered,
       totalQuestions: questionIds.length,

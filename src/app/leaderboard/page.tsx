@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CalendarDays, Clock, Crown, Star, Trophy } from "lucide-react";
 import { useLocale } from "@/lib/i18n/LocaleProvider";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { ProfileMenu } from "@/components/ProfileMenu";
 import { BottomNav } from "@/components/BottomNav";
+import { LeaderboardSkeleton } from "@/components/skeletons/PageSkeletons";
 import { formatDurationMs, formatSeasonRemaining } from "@/lib/format";
+import { useMe } from "@/hooks/useMe";
 
 type Entry = {
   userId: string;
@@ -41,35 +43,34 @@ type LeaderboardResponse = {
 
 const MEDALS = ["🥇", "🥈", "🥉"];
 
-type MeUser = { username: string; walletAddress: string };
-
 export default function LeaderboardPage() {
   const { t, locale } = useLocale();
   const [period, setPeriod] = useState<"weekly" | "global">("weekly");
   const [data, setData] = useState<LeaderboardResponse | null>(null);
-  const [meUser, setMeUser] = useState<MeUser | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
+  const cacheRef = useRef<
+    Partial<Record<"weekly" | "global", LeaderboardResponse>>
+  >({});
+
+  const { data: meData } = useMe();
+  const meUser = meData?.user ?? null;
+  const isAdmin = !!meData?.isAdmin;
 
   useEffect(() => {
-    fetch("/api/users/me", { credentials: "include" })
-      .then(async (r) => {
-        if (r.ok) {
-          const json = (await r.json()) as { user: MeUser; isAdmin?: boolean };
-          setMeUser(json.user);
-          setIsAdmin(!!json.isAdmin);
-        }
-      })
-      .catch(() => {});
-  }, []);
+    const cached = cacheRef.current[period];
+    if (cached) {
+      setData(cached);
+      setLoading(false);
+      return;
+    }
 
-  useEffect(() => {
     let cancelled = false;
     setLoading(true);
     fetch(`/api/leaderboard?period=${period}`, { credentials: "include" })
       .then((r) => r.json())
-      .then((d) => {
+      .then((d: LeaderboardResponse) => {
         if (!cancelled) {
+          cacheRef.current[period] = d;
           setData(d);
           setLoading(false);
         }
@@ -233,7 +234,9 @@ export default function LeaderboardPage() {
                 {t.leaderboard.pastSeasons}
               </h2>
               <div className="mt-3 flex flex-col gap-2">
-                {data.archivedSeasons.map((s, i) => (
+                {data.archivedSeasons
+                  .filter((s) => s.topEntries.length > 0)
+                  .map((s, i) => (
                   <div
                     key={s.weekKey}
                     className="rounded-2xl bg-surface px-4 py-3 ring-1 ring-h-border card-depth-sm"
@@ -246,7 +249,7 @@ export default function LeaderboardPage() {
                     <div className="mt-2 flex flex-wrap gap-2">
                       {s.topEntries.map((e) => (
                         <span
-                          key={e.rank}
+                          key={`${s.weekKey}-${e.rank}`}
                           className="inline-flex items-center gap-1 rounded-full bg-h-background px-2.5 py-1 text-xs font-bold text-h-foreground ring-1 ring-h-border"
                         >
                           {MEDALS[e.rank - 1]} {e.username}{" "}
