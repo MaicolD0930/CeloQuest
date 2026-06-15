@@ -114,13 +114,16 @@ model Achievement {
   title       String
   description String
   emoji       String
-  // Future onchain fields
+  status      String        @default("pending")
   nftTokenId  String?
   txHash      String?
   mintedAt    DateTime?
   createdAt   DateTime      @default(now())
   user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   season      WeeklySeason? @relation(fields: [seasonId], references: [id], onDelete: SetNull)
+
+  @@index([userId, status])
+  @@index([userId, type])
 }
 
 model RewardDistribution {

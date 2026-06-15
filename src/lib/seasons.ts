@@ -1,8 +1,12 @@
 import { prisma } from "@/lib/prisma";
 import { weekEnd, weekKey, weekStart } from "@/lib/game";
 import { prepareWeeklyRewardDistribution } from "@/lib/contracts/rewards";
-import { awardParticipationNft } from "@/lib/achievements";
+import { unlockAchievement } from "@/lib/achievements";
 import { previousWeekKey } from "@/lib/game";
+import {
+  markSeasonSynced,
+  shouldSkipSeasonSync,
+} from "@/lib/seasons-sync-cache";
 
 export type SeasonRankingEntry = {
   userId: string;
@@ -15,25 +19,16 @@ export type SeasonRankingEntry = {
 
 const ACHIEVEMENT_DEFS = {
   weekly_champion: {
+    type: "weekly_champion" as const,
     emoji: "🏆",
-    titleEs: "Campeón Semanal",
-    titleEn: "Weekly Champion",
-    descEs: "Primer lugar en la temporada semanal",
-    descEn: "First place in the weekly season",
   },
   weekly_runner_up: {
+    type: "weekly_runner_up" as const,
     emoji: "🥈",
-    titleEs: "Subcampeón Semanal",
-    titleEn: "Weekly Runner-up",
-    descEs: "Segundo lugar en la temporada semanal",
-    descEn: "Second place in the weekly season",
   },
   weekly_third: {
+    type: "weekly_third" as const,
     emoji: "🥉",
-    titleEs: "Tercer Lugar Semanal",
-    titleEn: "Weekly Third Place",
-    descEs: "Tercer lugar en la temporada semanal",
-    descEn: "Third place in the weekly season",
   },
 } as const;
 
@@ -156,16 +151,8 @@ export async function finalizeSeasonRecord(seasonId: string, key: string) {
 
     const achType = rankAchievementType(rank);
     if (achType) {
-      const def = ACHIEVEMENT_DEFS[achType];
-      await prisma.achievement.create({
-        data: {
-          userId: entry.userId,
-          seasonId,
-          type: achType,
-          title: def.titleEs,
-          description: def.descEs,
-          emoji: def.emoji,
-        },
+      await unlockAchievement(entry.userId, ACHIEVEMENT_DEFS[achType].type, {
+        seasonId,
       });
     }
   }
@@ -177,7 +164,10 @@ export async function finalizeSeasonRecord(seasonId: string, key: string) {
 
   await prepareWeeklyRewardDistribution(seasonId, topThree);
 
-  await awardWeeklyParticipationNfts(seasonId, key);
+  await updateWeeklyParticipationStats(key);
+
+  const { distributeCompetitiveNfts } = await import("@/lib/achievements");
+  await distributeCompetitiveNfts(seasonId);
 
   await prisma.weeklySeason.update({
     where: { id: seasonId },
@@ -205,8 +195,8 @@ export async function createNextActiveSeason() {
   return season;
 }
 
-/** Award streak NFTs to users who completed at least one daily challenge in the week. */
-async function awardWeeklyParticipationNfts(seasonId: string, key: string) {
+/** Update participation streak counters (no NFT). */
+async function updateWeeklyParticipationStats(key: string) {
   const calendarKey = seasonCalendarKey(key);
   const start = weekStart(new Date(calendarKey + "T00:00:00.000Z"));
   const end = weekEnd(new Date(calendarKey + "T00:00:00.000Z"));
@@ -235,8 +225,6 @@ async function awardWeeklyParticipationNfts(seasonId: string, key: string) {
         totalWeeksParticipated: user.totalWeeksParticipated + 1,
       },
     });
-
-    await awardParticipationNft(userId, seasonId, streak);
   }
 }
 
@@ -253,15 +241,20 @@ export async function ensureActiveSeason() {
 
   const paidStillActive = await prisma.weeklySeason.findMany({
     where: { status: "active", rewardPaid: true },
+    include: { _count: { select: { entries: true } } },
   });
   for (const season of paidStillActive) {
-    await prisma.weeklySeason.update({
-      where: { id: season.id },
-      data: {
-        status: "archived",
-        finalizedAt: season.finalizedAt ?? new Date(),
-      },
-    });
+    if (season._count.entries === 0) {
+      await finalizeSeasonRecord(season.id, season.weekKey);
+    } else {
+      await prisma.weeklySeason.update({
+        where: { id: season.id },
+        data: {
+          status: "archived",
+          finalizedAt: season.finalizedAt ?? new Date(),
+        },
+      });
+    }
   }
 
   const stale = await prisma.weeklySeason.findMany({
@@ -281,10 +274,18 @@ export async function ensureActiveSeason() {
 }
 
 /** Best-effort season sync — never blocks gameplay if seasons fail. */
-export async function safeSeasonSync(userId?: string) {
+export async function safeSeasonSync(
+  userId?: string,
+  options?: { force?: boolean }
+) {
+  if (!options?.force && shouldSkipSeasonSync(userId)) {
+    return;
+  }
+
   try {
     await ensureActiveSeason();
     if (userId) await syncUserWeek(userId);
+    markSeasonSynced(userId);
   } catch (e) {
     console.error("[seasons] safeSeasonSync failed:", e);
   }
@@ -312,7 +313,7 @@ export async function syncUserWeek(userId: string) {
 
 export async function getCurrentSeasonLeaderboard(meId: string | null) {
   try {
-    await ensureActiveSeason();
+    await safeSeasonSync(meId ?? undefined, { force: true });
   } catch (e) {
     console.error("[seasons] leaderboard sync failed:", e);
   }
@@ -358,14 +359,40 @@ export async function getCurrentSeasonLeaderboard(meId: string | null) {
 export async function getArchivedSeasons(limit = 10) {
   if (!("weeklySeason" in prisma)) return [];
   try {
-    return await prisma.weeklySeason.findMany({
+    const rows = await prisma.weeklySeason.findMany({
       where: { status: "archived" },
       orderBy: { finalizedAt: "desc" },
-      take: limit,
+      take: limit * 3,
       include: {
         entries: { orderBy: { rank: "asc" }, take: 10 },
       },
     });
+
+    // Drop empty archives (paid/rotated without a ranking snapshot).
+    const withEntries = rows.filter((s) => s.entries.length > 0);
+
+    // One card per calendar week — keep the archive that has the richest snapshot.
+    const byCalendar = new Map<string, (typeof withEntries)[number]>();
+    for (const season of withEntries) {
+      const cal = seasonCalendarKey(season.weekKey);
+      const prev = byCalendar.get(cal);
+      if (
+        !prev ||
+        season.entries.length > prev.entries.length ||
+        (season.entries.length === prev.entries.length &&
+          (season.finalizedAt?.getTime() ?? 0) >
+            (prev.finalizedAt?.getTime() ?? 0))
+      ) {
+        byCalendar.set(cal, season);
+      }
+    }
+
+    return [...byCalendar.values()]
+      .sort(
+        (a, b) =>
+          (b.finalizedAt?.getTime() ?? 0) - (a.finalizedAt?.getTime() ?? 0)
+      )
+      .slice(0, limit);
   } catch (e) {
     console.error("[seasons] getArchivedSeasons failed:", e);
     return [];

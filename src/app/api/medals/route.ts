@@ -1,12 +1,17 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/session";
-
-export async function GET() {
+import { resolveAchievementSeasonLabel } from "@/lib/seasons/display";
+import { getSeasonNumberMap } from "@/lib/seasons/season-numbers";
+import type { Locale } from "@/lib/i18n/dictionaries";
+export async function GET(req: Request) {
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
+
+  const url = new URL(req.url);
+  const locale = (url.searchParams.get("locale") === "en" ? "en" : "es") as Locale;
 
   try {
     const achievements =
@@ -16,7 +21,12 @@ export async function GET() {
             orderBy: { createdAt: "desc" },
             include: {
               season: {
-                select: { weekKey: true, startDate: true, endDate: true },
+                select: {
+                  id: true,
+                  weekKey: true,
+                  startDate: true,
+                  endDate: true,
+                },
               },
             },
           })
@@ -55,26 +65,25 @@ export async function GET() {
       },
     });
 
-    const pendingRewards =
-      "rewardDistribution" in prisma
-        ? await prisma.rewardDistribution.findMany({
-            where: { userId: user.id },
-            orderBy: { createdAt: "desc" },
-            include: {
-              season: { select: { weekKey: true } },
-            },
-          })
-        : [];
+    const seasonNumbers = await getSeasonNumberMap();
+    const achievementsWithSeason = achievements.map((a) => ({
+      ...a,
+      seasonLabel: resolveAchievementSeasonLabel(
+        a.type,
+        a.season,
+        a.season ? seasonNumbers.get(a.season.id) ?? null : null,
+        locale
+      ),
+    }));
 
     return NextResponse.json({
       username: user.username,
       walletAddress: user.walletAddress,
       participationStreak: user.participationStreak,
       totalWeeksParticipated: user.totalWeeksParticipated,
-      achievements,
+      achievements: achievementsWithSeason,
       seasonHistory,
       dailyHistory,
-      pendingRewards,
     });
   } catch (e) {
     console.error("GET /api/medals failed:", e);

@@ -1,0 +1,15 @@
+{
+  "name": "CeloQuest First Challenge",
+  "description": "Completed your first daily challenge",
+  "image": "http://localhost:3000/nft-assets/images/2.png",
+  "attributes": [
+    {
+      "trait_type": "Collection",
+      "value": "CeloQuest"
+    },
+    {
+      "trait_type": "Category",
+      "value": "Learning"
+    }
+  ]
+}

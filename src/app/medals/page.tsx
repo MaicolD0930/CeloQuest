@@ -17,6 +17,9 @@ import { LanguageToggle } from "@/components/LanguageToggle";
 import { ProfileMenu } from "@/components/ProfileMenu";
 import { BottomNav } from "@/components/BottomNav";
 import { formatDurationMs } from "@/lib/format";
+import { useMe } from "@/hooks/useMe";
+import { resolveAchievementDisplay } from "@/lib/achievements/catalog";
+import { AchievementSeasonLabel } from "@/components/AchievementSeasonLabel";
 
 type Achievement = {
   id: string;
@@ -24,11 +27,13 @@ type Achievement = {
   title: string;
   description: string;
   emoji: string;
+  status?: string;
   nftTokenId: string | null;
   txHash: string | null;
   mintedAt: string | null;
   createdAt: string;
   season: { weekKey: string; startDate: string; endDate: string } | null;
+  seasonLabel: string | null;
 };
 
 type SeasonEntry = {
@@ -36,14 +41,6 @@ type SeasonEntry = {
   xp: number;
   durationMs: number;
   season: { weekKey: string; startDate: string; endDate: string; status: string };
-};
-
-type Reward = {
-  rank: number;
-  rewardType: string;
-  amount: string | null;
-  status: string;
-  season: { weekKey: string };
 };
 
 type MedalsResponse = {
@@ -60,7 +57,6 @@ type MedalsResponse = {
     result: string;
     lifeRefillUsed: boolean;
   }[];
-  pendingRewards: Reward[];
 };
 
 const RANK_MEDALS = ["🥇", "🥈", "🥉"];
@@ -68,7 +64,8 @@ const RANK_MEDALS = ["🥇", "🥈", "🥉"];
 export default function MedalsPage() {
   const { t, locale } = useLocale();
   const [data, setData] = useState<MedalsResponse | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const { data: meData } = useMe();
+  const isAdmin = !!meData?.isAdmin;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -76,7 +73,7 @@ export default function MedalsPage() {
     setError(null);
     setLoading(true);
     try {
-      const r = await fetch("/api/medals", { credentials: "include" });
+      const r = await fetch(`/api/medals?locale=${locale}`, { credentials: "include" });
       if (r.status === 401) {
         window.location.assign("/connect");
         return;
@@ -91,18 +88,7 @@ export default function MedalsPage() {
     } finally {
       setLoading(false);
     }
-  }, [t.common.error]);
-
-  useEffect(() => {
-    fetch("/api/users/me", { credentials: "include" })
-      .then(async (r) => {
-        if (r.ok) {
-          const json = (await r.json()) as { isAdmin?: boolean };
-          setIsAdmin(!!json.isAdmin);
-        }
-      })
-      .catch(() => {});
-  }, []);
+  }, [locale, t.common.error]);
 
   useEffect(() => {
     loadMedals();
@@ -228,32 +214,54 @@ export default function MedalsPage() {
             <EmptyState message={t.medals.noAchievements} />
           ) : (
             <div className="flex flex-col gap-2">
-              {data.achievements.map((a, i) => (
+              {data.achievements.map((a, i) => {
+                const display = resolveAchievementDisplay(a.type, locale, {
+                  title: a.title,
+                  description: a.description,
+                  emoji: a.emoji,
+                });
+                const claimable =
+                  a.status === "pending" && display.claimMode === "manual";
+
+                return (
                 <div
                   key={a.id}
                   className="animate-card-pop flex items-center gap-3 rounded-2xl bg-surface px-4 py-3 ring-1 ring-h-border card-depth-sm"
                   style={{ animationDelay: `${200 + i * 40}ms` }}
                 >
                   <div className="grid size-12 shrink-0 place-items-center rounded-xl bg-h-background text-2xl ring-1 ring-h-border">
-                    {a.emoji}
+                    {display.emoji}
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-display font-bold text-h-foreground">
-                      {a.title}
+                      {display.title}
                     </p>
-                    <p className="text-xs font-semibold text-h-muted">{a.description}</p>
+                    <p className="text-xs font-semibold text-h-muted">
+                      {display.description}
+                    </p>
+                    {a.seasonLabel && (
+                      <AchievementSeasonLabel label={a.seasonLabel} />
+                    )}
                     {a.nftTokenId ? (
                       <p className="mt-1 text-[10px] font-bold text-prosperity">
                         NFT #{a.nftTokenId}
                       </p>
-                    ) : (
+                    ) : claimable ? (
+                      <Link
+                        href="/achievements"
+                        className="mt-1 inline-block text-[10px] font-bold text-lemon"
+                      >
+                        {t.achievements.statusAvailable}
+                      </Link>
+                    ) : display.claimMode === "badge" ? null : (
                       <p className="mt-1 text-[10px] font-bold text-h-muted/60">
                         {t.medals.onchainSoon}
                       </p>
                     )}
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </Section>
@@ -333,35 +341,6 @@ export default function MedalsPage() {
             </div>
           )}
         </Section>
-
-        {data.pendingRewards.length > 0 && (
-          <Section
-            title={t.medals.pendingRewards}
-            icon={<Medal className="size-4 text-lemon" />}
-            delay="400ms"
-          >
-            <div className="flex flex-col gap-2">
-              {data.pendingRewards.map((r, i) => (
-                <div
-                  key={i}
-                  className="animate-card-pop rounded-2xl border-2 border-dashed border-prosperity/40 bg-prosperity/10 px-4 py-3 ring-1 ring-prosperity/20"
-                  style={{ animationDelay: `${440 + i * 40}ms` }}
-                >
-                  <p className="font-display font-bold text-h-foreground">
-                    {r.rewardType === "token" ? "💰" : "🎨"}{" "}
-                    {r.rewardType === "token"
-                      ? t.medals.tokenReward
-                      : t.medals.nftReward}{" "}
-                    · #{r.rank}
-                  </p>
-                  <p className="mt-0.5 text-xs font-semibold text-h-muted">
-                    {t.medals.status}: {r.status}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </Section>
-        )}
       </main>
       <BottomNav variant="perfil" />
     </>

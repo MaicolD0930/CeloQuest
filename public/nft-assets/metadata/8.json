@@ -1,0 +1,15 @@
+{
+  "name": "CeloQuest Third Place",
+  "description": "Third place in the weekly season",
+  "image": "http://localhost:3000/nft-assets/images/8.png",
+  "attributes": [
+    {
+      "trait_type": "Collection",
+      "value": "CeloQuest"
+    },
+    {
+      "trait_type": "Category",
+      "value": "Competition"
+    }
+  ]
+}

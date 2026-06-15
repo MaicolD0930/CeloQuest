@@ -216,6 +216,10 @@ npm run contracts:sync:recovery-prices
 
 ## Mainnet migration (tCOPM → cCOPM)
 
+**Plan completo para demo/producción:** ver [`docs/MAINNET_MIGRATION.md`](../docs/MAINNET_MIGRATION.md).
+
+Resumen rápido:
+
 1. Set `NEXT_PUBLIC_CELO_NETWORK=mainnet`
 2. Deploy or configure real **cCOPM** address
 3. Deploy new `RecoveryPaymentContract` on mainnet

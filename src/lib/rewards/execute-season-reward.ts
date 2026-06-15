@@ -267,6 +267,9 @@ export async function completeSeasonWithReward(params: {
     if (!season) {
       return { ok: false, reason: "SEASON_NOT_FOUND" };
     }
+  } else {
+    const { distributeCompetitiveNfts } = await import("@/lib/achievements");
+    await distributeCompetitiveNfts(season.id);
   }
 
   const payResult = await executeSeasonReward({ seasonId: season.id });
