@@ -465,7 +465,13 @@ export default function ChallengePage() {
         payerWallet ?? undefined
       );
 
-      let refillData: Record<string, unknown> | null = null;
+      type RefillResponse = {
+        livesLeft: number;
+        startedAt?: string;
+        activeDurationMs?: number;
+      };
+
+      let refillData: RefillResponse | null = null;
       let refillApiError: string | undefined;
       const refillAttempts = 8;
       for (let attempt = 0; attempt < refillAttempts; attempt++) {
@@ -479,7 +485,7 @@ export default function ChallengePage() {
           body: JSON.stringify({ txHash, token: paidToken }),
         });
         if (res.ok) {
-          refillData = await res.json();
+          refillData = (await res.json()) as RefillResponse;
           break;
         }
         try {
