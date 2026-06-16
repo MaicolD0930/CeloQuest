@@ -12,11 +12,11 @@ import { getActiveChain, getRpcUrl, getTxExplorerUrl } from "@/lib/chain/config"
 import {
   getRewardsContractAddress,
   rewardsContractAbi,
-  WEEKLY_REWARD_TCOPM,
+  WEEKLY_REWARD_USDC,
   weekKeyToSeasonId,
 } from "@/lib/contracts/rewards-abi";
 
-export { WEEKLY_REWARD_TCOPM, weekKeyToSeasonId };
+export { WEEKLY_REWARD_USDC, weekKeyToSeasonId };
 
 export type SeasonWinner = {
   userId: string;
@@ -127,8 +127,8 @@ export async function getSeasonRewardStatus(
     rewardTxHash: season.rewardTxHash,
     rewardPaidAt: season.rewardPaidAt?.toISOString() ?? null,
     winner,
-    prizeAmount: WEEKLY_REWARD_TCOPM,
-    prizeSymbol: "tCOPM",
+    prizeAmount: WEEKLY_REWARD_USDC,
+    prizeSymbol: "USDC",
     onChainSeasonId,
     contractAddress,
     contractPaid,
@@ -179,7 +179,7 @@ export async function executeSeasonReward(params: {
   const onChainSeasonId = weekKeyToSeasonId(season.weekKey);
   const paidOnChain = await isSeasonPaidOnChain(onChainSeasonId);
   if (paidOnChain) {
-    await syncSeasonPaidFromChain(season.id, season.weekKey, onChainSeasonId);
+    await syncSeasonPaidFromChain(season.id, season.weekKey);
     return { ok: false, reason: "SEASON_ALREADY_PAID_ON_CHAIN" };
   }
 
@@ -195,16 +195,20 @@ export async function executeSeasonReward(params: {
     transport: http(getRpcUrl()),
   });
 
+  const fn = params.force
+    ? "finalizeSeasonRewardForced"
+    : "finalizeSeasonReward";
+
   let txHash: Hash;
   try {
     txHash = await walletClient.writeContract({
       address: contract,
       abi: rewardsContractAbi,
-      functionName: "finalizeSeasonReward",
+      functionName: fn,
       args: [onChainSeasonId, winner.walletAddress as `0x${string}`],
     });
   } catch (error) {
-    console.error("finalizeSeasonReward writeContract error:", error);
+    console.error(`${fn} writeContract error:`, error);
     return { ok: false, reason: "CONTRACT_CALL_FAILED" };
   }
 
@@ -267,12 +271,12 @@ export async function completeSeasonWithReward(params: {
     if (!season) {
       return { ok: false, reason: "SEASON_NOT_FOUND" };
     }
-  } else {
-    const { distributeCompetitiveNfts } = await import("@/lib/achievements");
-    await distributeCompetitiveNfts(season.id);
   }
 
-  const payResult = await executeSeasonReward({ seasonId: season.id });
+  const payResult = await executeSeasonReward({
+    seasonId: season.id,
+    force: true,
+  });
   if (!payResult.ok) {
     return payResult;
   }
@@ -306,7 +310,7 @@ async function recordSeasonRewardPayment(params: {
     data: {
       rewardPaid: true,
       rewardWinnerWallet: params.winner.walletAddress.toLowerCase(),
-      rewardAmount: WEEKLY_REWARD_TCOPM,
+      rewardAmount: WEEKLY_REWARD_USDC,
       rewardTxHash: params.txHash.toLowerCase(),
       rewardPaidAt: paidAt,
     },
@@ -321,7 +325,7 @@ async function recordSeasonRewardPayment(params: {
     },
     data: {
       status: "paid",
-      amount: WEEKLY_REWARD_TCOPM,
+      amount: WEEKLY_REWARD_USDC,
       txHash: params.txHash.toLowerCase(),
     },
   });
@@ -343,7 +347,7 @@ async function recordSeasonRewardPayment(params: {
         walletAddress: params.winner.walletAddress.toLowerCase(),
         rank: 1,
         rewardType: "token",
-        amount: WEEKLY_REWARD_TCOPM,
+        amount: WEEKLY_REWARD_USDC,
         status: "paid",
         txHash: params.txHash.toLowerCase(),
       },
@@ -367,11 +371,7 @@ async function recordSeasonRewardPayment(params: {
   }
 }
 
-async function syncSeasonPaidFromChain(
-  seasonId: string,
-  weekKey: string,
-  onChainSeasonId: `0x${string}`
-) {
+async function syncSeasonPaidFromChain(seasonId: string, weekKey: string) {
   const winner = await resolveSeasonWinner({
     id: seasonId,
     weekKey,
@@ -384,7 +384,7 @@ async function syncSeasonPaidFromChain(
     data: {
       rewardPaid: true,
       rewardWinnerWallet: winner.walletAddress.toLowerCase(),
-      rewardAmount: WEEKLY_REWARD_TCOPM,
+      rewardAmount: WEEKLY_REWARD_USDC,
       rewardPaidAt: new Date(),
     },
   });

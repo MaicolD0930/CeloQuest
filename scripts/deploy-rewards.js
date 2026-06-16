@@ -4,6 +4,7 @@ const fs = require("fs");
 const path = require("path");
 
 const DEFAULT_ADMIN = "0x089189B7942588bDBAdcc5cFc8E76d8bd1073bd4";
+const DEFAULT_USDC_SEPOLIA = "0x01C5C0122039549AD1493B8220cABEdD739BC44E";
 
 async function main() {
   const { ethers } = hre;
@@ -15,25 +16,30 @@ async function main() {
     process.env.RECOVERY_TREASURY_ADDRESS ??
     DEFAULT_ADMIN;
 
-  const tcopm =
-    process.env.TCOPM_ADDRESS ?? process.env.NEXT_PUBLIC_TCOPM_ADDRESS;
-  if (!tcopm) throw new Error("Set TCOPM_ADDRESS in .env");
+  const automator =
+    process.env.REWARDS_AUTOMATOR_ADDRESS ?? deployer.address;
+
+  const usdc =
+    process.env.USDC_ADDRESS ??
+    process.env.NEXT_PUBLIC_USDC_ADDRESS ??
+    DEFAULT_USDC_SEPOLIA;
 
   console.log("Deploying CeloQuestRewards");
   console.log("  Deployer:     ", deployer.address);
   console.log("  Admin owner:  ", admin);
-  console.log("  tCOPM token:  ", tcopm);
-  console.log("  Reward amount: 25,000 tCOPM");
+  console.log("  Automator:    ", automator);
+  console.log("  USDC token:   ", usdc);
+  console.log("  Reward amount: 3 USDC");
 
   const Factory = await ethers.getContractFactory("CeloQuestRewards");
-  const contract = await Factory.deploy(tcopm, admin);
+  const contract = await Factory.deploy(usdc, admin, automator);
   await contract.waitForDeployment();
 
   const address = await contract.getAddress();
   console.log("\n✅ CeloQuestRewards deployed:", address);
-  console.log("\nFund the contract with tCOPM before paying rewards:");
+  console.log("\nFund the contract with USDC before paying rewards:");
   console.log("  1. Approve:", address);
-  console.log("  2. Call deposit(amount) as owner, or transfer tCOPM directly");
+  console.log("  2. Call deposit(amount) as owner, or transfer USDC directly");
 
   const deployment = {
     network: "celoSepolia",
@@ -42,9 +48,10 @@ async function main() {
     address,
     deployer: deployer.address,
     adminOwner: admin,
-    rewardToken: tcopm,
-    rewardAmountTcopm: "25000",
-    rewardAmountAtomic: "25000000000",
+    automator,
+    rewardToken: usdc,
+    rewardAmountUsdc: "3",
+    rewardAmountAtomic: "3000000",
     deployedAt: new Date().toISOString(),
   };
 
@@ -56,6 +63,7 @@ async function main() {
   console.log("\nAdd to .env:");
   console.log(`REWARDS_CONTRACT_ADDRESS=${address}`);
   console.log(`NEXT_PUBLIC_REWARDS_CONTRACT_ADDRESS=${address}`);
+  console.log(`REWARDS_AUTOMATOR_ADDRESS=${automator}`);
 }
 
 main().catch((err) => {

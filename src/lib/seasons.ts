@@ -166,9 +166,6 @@ export async function finalizeSeasonRecord(seasonId: string, key: string) {
 
   await updateWeeklyParticipationStats(key);
 
-  const { distributeCompetitiveNfts } = await import("@/lib/achievements");
-  await distributeCompetitiveNfts(seasonId);
-
   await prisma.weeklySeason.update({
     where: { id: seasonId },
     data: { status: "archived", finalizedAt: new Date() },

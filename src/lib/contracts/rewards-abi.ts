@@ -5,11 +5,21 @@ export const REWARDS_CONTRACT_ADDRESS =
   process.env.NEXT_PUBLIC_REWARDS_CONTRACT_ADDRESS ??
   "";
 
-export const WEEKLY_REWARD_TCOPM = "25000";
+export const WEEKLY_REWARD_USDC = "3";
 
 export const rewardsContractAbi = [
   {
     name: "finalizeSeasonReward",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "seasonId", type: "bytes32" },
+      { name: "winner", type: "address" },
+    ],
+    outputs: [],
+  },
+  {
+    name: "finalizeSeasonRewardForced",
     type: "function",
     stateMutability: "nonpayable",
     inputs: [
@@ -33,6 +43,13 @@ export const rewardsContractAbi = [
     outputs: [{ name: "", type: "uint256" }],
   },
   {
+    name: "automator",
+    type: "function",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
+  },
+  {
     name: "SeasonRewardPaid",
     type: "event",
     inputs: [
@@ -40,6 +57,7 @@ export const rewardsContractAbi = [
       { name: "winner", type: "address", indexed: true },
       { name: "amount", type: "uint256", indexed: false },
       { name: "timestamp", type: "uint256", indexed: false },
+      { name: "forced", type: "bool", indexed: false },
     ],
   },
 ] as const;

@@ -230,6 +230,34 @@ No frontend code changes required — token list comes from env + contract confi
 
 ---
 
+## CeloQuestRewards (weekly USDC prize)
+
+| Function | Caller | Purpose |
+|----------|--------|---------|
+| `finalizeSeasonReward` | Owner or automator | Scheduled weekly payout (Vercel Cron → `/api/cron/seasons`) |
+| `finalizeSeasonRewardForced` | Owner only | Manual admin override from panel |
+| `deposit` | Owner | Fund contract with USDC |
+| `setAutomator` | Owner | Update backend wallet |
+
+Deploy:
+
+```bash
+npm run contracts:deploy:rewards
+```
+
+Reward: **3 USDC** (6 decimals). Fund the contract with USDC before paying seasons.
+
+Env:
+
+```env
+REWARDS_CONTRACT_ADDRESS=0x...
+NEXT_PUBLIC_REWARDS_CONTRACT_ADDRESS=0x...
+REWARDS_AUTOMATOR_ADDRESS=0x...   # optional, defaults to deployer
+CRON_SECRET=...                   # Vercel Cron auth header
+```
+
+---
+
 ## Events
 
 ```solidity

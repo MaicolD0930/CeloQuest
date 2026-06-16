@@ -287,7 +287,7 @@ export function AdminRewardsPanel({ labels }: Props) {
                   {labels.prize}:{" "}
                   <span className="font-bold text-lemon">
                     {s.rewardAmount
-                      ? `${Number(s.rewardAmount).toLocaleString()} tCOPM`
+                      ? `${Number(s.rewardAmount).toLocaleString()} USDC`
                       : "—"}
                   </span>
                   {" · "}

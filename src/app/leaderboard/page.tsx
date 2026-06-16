@@ -6,6 +6,7 @@ import { useLocale } from "@/lib/i18n/LocaleProvider";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { ProfileMenu } from "@/components/ProfileMenu";
 import { BottomNav } from "@/components/BottomNav";
+import { WeeklyPrizeBanner } from "@/components/WeeklyPrizeBanner";
 import { formatDurationMs, formatSeasonRemaining } from "@/lib/format";
 import { useMe } from "@/hooks/useMe";
 
@@ -176,6 +177,10 @@ export default function LeaderboardPage() {
             </button>
           ))}
         </div>
+
+        {period === "weekly" && (
+          <WeeklyPrizeBanner variant="featured" className="mt-4" />
+        )}
 
         {period === "weekly" && (
           <p
