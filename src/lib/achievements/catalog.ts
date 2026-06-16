@@ -1,7 +1,8 @@
 import type { Locale } from "@/lib/i18n/dictionaries";
 
 export type AchievementStatus = "pending" | "claimed" | "failed";
-export type AchievementClaimMode = "manual" | "auto" | "badge";
+/** All achievements are in-app personal badges (no on-chain mint). */
+export type AchievementClaimMode = "badge";
 
 export type AchievementType =
   | "first_wallet"
@@ -17,7 +18,6 @@ export type AchievementType =
 
 export type AchievementDef = {
   type: AchievementType;
-  tokenId: number | null;
   claimMode: AchievementClaimMode;
   emoji: string;
   name: Record<Locale, string>;
@@ -28,8 +28,7 @@ export type AchievementDef = {
 export const ACHIEVEMENT_CATALOG: Record<AchievementType, AchievementDef> = {
   first_wallet: {
     type: "first_wallet",
-    tokenId: 1,
-    claimMode: "manual",
+    claimMode: "badge",
     emoji: "🌱",
     name: { es: "Primera wallet", en: "First Wallet" },
     description: {
@@ -40,8 +39,7 @@ export const ACHIEVEMENT_CATALOG: Record<AchievementType, AchievementDef> = {
   },
   first_challenge: {
     type: "first_challenge",
-    tokenId: 2,
-    claimMode: "manual",
+    claimMode: "badge",
     emoji: "🎯",
     name: { es: "Primer reto", en: "First Challenge" },
     description: {
@@ -52,8 +50,7 @@ export const ACHIEVEMENT_CATALOG: Record<AchievementType, AchievementDef> = {
   },
   streak_3: {
     type: "streak_3",
-    tokenId: 3,
-    claimMode: "manual",
+    claimMode: "badge",
     emoji: "🔥",
     name: { es: "Racha de 3 días", en: "3 Day Streak" },
     description: {
@@ -64,8 +61,7 @@ export const ACHIEVEMENT_CATALOG: Record<AchievementType, AchievementDef> = {
   },
   streak_7: {
     type: "streak_7",
-    tokenId: 4,
-    claimMode: "manual",
+    claimMode: "badge",
     emoji: "⚡",
     name: { es: "Racha de 7 días", en: "7 Day Streak" },
     description: {
@@ -76,7 +72,6 @@ export const ACHIEVEMENT_CATALOG: Record<AchievementType, AchievementDef> = {
   },
   first_celo_learning: {
     type: "first_celo_learning",
-    tokenId: null,
     claimMode: "badge",
     emoji: "💛",
     name: { es: "Primer aprendizaje Celo", en: "First Celo Lesson" },
@@ -88,7 +83,6 @@ export const ACHIEVEMENT_CATALOG: Record<AchievementType, AchievementDef> = {
   },
   tier_blockchain_user: {
     type: "tier_blockchain_user",
-    tokenId: null,
     claimMode: "badge",
     emoji: "🔗",
     name: { es: "Usuario Blockchain", en: "Blockchain User" },
@@ -100,8 +94,7 @@ export const ACHIEVEMENT_CATALOG: Record<AchievementType, AchievementDef> = {
   },
   tier_celo_explorer: {
     type: "tier_celo_explorer",
-    tokenId: 5,
-    claimMode: "manual",
+    claimMode: "badge",
     emoji: "🟢",
     name: { es: "Celo Explorer", en: "Celo Explorer" },
     description: {
@@ -112,8 +105,7 @@ export const ACHIEVEMENT_CATALOG: Record<AchievementType, AchievementDef> = {
   },
   weekly_champion: {
     type: "weekly_champion",
-    tokenId: 6,
-    claimMode: "auto",
+    claimMode: "badge",
     emoji: "🏆",
     name: { es: "Campeón semanal", en: "Weekly Champion" },
     description: {
@@ -124,8 +116,7 @@ export const ACHIEVEMENT_CATALOG: Record<AchievementType, AchievementDef> = {
   },
   weekly_runner_up: {
     type: "weekly_runner_up",
-    tokenId: 7,
-    claimMode: "auto",
+    claimMode: "badge",
     emoji: "🥈",
     name: { es: "Subcampeón semanal", en: "Second Place" },
     description: {
@@ -136,8 +127,7 @@ export const ACHIEVEMENT_CATALOG: Record<AchievementType, AchievementDef> = {
   },
   weekly_third: {
     type: "weekly_third",
-    tokenId: 8,
-    claimMode: "auto",
+    claimMode: "badge",
     emoji: "🥉",
     name: { es: "Tercer lugar semanal", en: "Third Place" },
     description: {
@@ -155,14 +145,6 @@ const LEGACY_ACHIEVEMENT_ALIASES: Record<string, AchievementType> = {
   blockchain_user: "tier_blockchain_user",
   tier_blockchain: "tier_blockchain_user",
 };
-
-export const PERSONAL_NFT_TYPES = (
-  Object.values(ACHIEVEMENT_CATALOG) as AchievementDef[]
-).filter((d) => d.claimMode === "manual" && d.tokenId != null);
-
-export const COMPETITIVE_NFT_TYPES = (
-  Object.values(ACHIEVEMENT_CATALOG) as AchievementDef[]
-).filter((d) => d.claimMode === "auto");
 
 export function getAchievementDef(type: string): AchievementDef | null {
   const key = LEGACY_ACHIEVEMENT_ALIASES[type] ?? type;
@@ -189,7 +171,6 @@ function inferLegacyAchievementType(
     return "tier_blockchain_user";
   }
 
-  // Level-3 tier only when copy explicitly references reaching that tier (not welcome badge).
   if (
     description.includes("alcanzaste el nivel") ||
     description.includes("you reached") ||

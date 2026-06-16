@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/session";
+import { normalizeLegacyAchievementStatuses } from "@/lib/achievements";
 import { resolveAchievementSeasonLabel } from "@/lib/seasons/display";
 import { getSeasonNumberMap } from "@/lib/seasons/season-numbers";
 import type { Locale } from "@/lib/i18n/dictionaries";
+
 export async function GET(req: Request) {
   const user = await getCurrentUser();
   if (!user) {
@@ -14,6 +16,8 @@ export async function GET(req: Request) {
   const locale = (url.searchParams.get("locale") === "en" ? "en" : "es") as Locale;
 
   try {
+    await normalizeLegacyAchievementStatuses(user.id);
+
     const achievements =
       "achievement" in prisma
         ? await prisma.achievement.findMany({

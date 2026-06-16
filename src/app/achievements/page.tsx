@@ -1,22 +1,23 @@
 "use client";
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import Link from "next/link";
 import {
   Award,
-  CheckCircle2,
+  CalendarDays,
   Clock,
-  ExternalLink,
-  Gift,
-  HelpCircle,
-  Sparkles,
-  X,
+  Copy,
+  Flame,
+  Medal,
+  ShieldCheck,
+  Star,
 } from "lucide-react";
 import { useLocale } from "@/lib/i18n/LocaleProvider";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { ProfileMenu } from "@/components/ProfileMenu";
 import { BottomNav } from "@/components/BottomNav";
+import { formatDurationMs } from "@/lib/format";
 import { useMe } from "@/hooks/useMe";
+import { resolveAchievementDisplay } from "@/lib/achievements/catalog";
 import { AchievementSeasonLabel } from "@/components/AchievementSeasonLabel";
 import { AchievementImageButton } from "@/components/AchievementImageButton";
 
@@ -27,38 +28,50 @@ type AchievementItem = {
   description: string;
   emoji: string;
   status: string;
-  claimMode: string;
   image: string | null;
-  nftTokenId: string | null;
-  txHash: string | null;
-  explorerUrl: string | null;
-  mintedAt: string | null;
   createdAt: string;
-  claimable: boolean;
-  season: { weekKey: string; startDate: string; endDate: string } | null;
   seasonLabel: string | null;
 };
 
-type AchievementsResponse = {
-  pendingCount: number;
-  achievements: AchievementItem[];
+type SeasonEntry = {
+  rank: number;
+  xp: number;
+  durationMs: number;
+  season: { weekKey: string; startDate: string; endDate: string; status: string };
 };
+
+type PageData = {
+  username: string;
+  walletAddress: string;
+  participationStreak: number;
+  totalWeeksParticipated: number;
+  achievements: AchievementItem[];
+  seasonHistory: SeasonEntry[];
+  dailyHistory: {
+    date: string;
+    xpEarned: number;
+    durationMs: number | null;
+    result: string;
+    lifeRefillUsed: boolean;
+  }[];
+};
+
+const RANK_MEDALS = ["🥇", "🥈", "🥉"];
 
 export default function AchievementsPage() {
   const { t, locale } = useLocale();
   const { data: meData } = useMe();
   const isAdmin = !!meData?.isAdmin;
-  const [data, setData] = useState<AchievementsResponse | null>(null);
+  const [data, setData] = useState<PageData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [claiming, setClaiming] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [nftHelpOpen, setNftHelpOpen] = useState(false);
+  const [tab, setTab] = useState<"badges" | "history">("badges");
 
   const load = useCallback(async () => {
     setError(null);
     setLoading(true);
     try {
-      const r = await fetch(`/api/achievements?locale=${locale}`, {
+      const r = await fetch(`/api/medals?locale=${locale}`, {
         credentials: "include",
       });
       if (r.status === 401) {
@@ -69,7 +82,28 @@ export default function AchievementsPage() {
         setError(t.common.error);
         return;
       }
-      setData(await r.json());
+      const medals = (await r.json()) as PageData;
+      setData({
+        ...medals,
+        achievements: medals.achievements.map((a) => {
+          const display = resolveAchievementDisplay(a.type, locale, {
+            title: a.title,
+            description: a.description,
+            emoji: a.emoji,
+          });
+          return {
+            id: a.id,
+            type: a.type,
+            title: display.title,
+            description: display.description,
+            emoji: display.emoji,
+            status: a.status ?? "claimed",
+            image: display.image,
+            createdAt: a.createdAt,
+            seasonLabel: a.seasonLabel,
+          };
+        }),
+      });
     } catch {
       setError(t.common.error);
     } finally {
@@ -81,44 +115,39 @@ export default function AchievementsPage() {
     void load();
   }, [load]);
 
-  useEffect(() => {
-    if (!nftHelpOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setNftHelpOpen(false);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [nftHelpOpen]);
-
-  async function handleClaim(type: string) {
-    setClaiming(type);
-    setError(null);
-    try {
-      const r = await fetch("/api/achievements/claim", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type }),
-      });
-      const body = await r.json().catch(() => ({}));
-      if (!r.ok) {
-        setError(body.error ?? t.common.error);
-        return;
-      }
-      await load();
-    } catch {
-      setError(t.common.error);
-    } finally {
-      setClaiming(null);
-    }
+  if (loading) {
+    return (
+      <>
+        <main className="home-perfil flex flex-1 flex-col items-center justify-center safe-top">
+          <div className="relative grid size-20 animate-float place-items-center rounded-full bg-prosperity/15 ring-2 ring-prosperity/30">
+            <Medal className="size-9 text-prosperity" />
+          </div>
+          <p className="mt-4 font-display text-sm font-semibold text-h-muted">
+            {t.common.loading}
+          </p>
+        </main>
+        <BottomNav variant="perfil" />
+      </>
+    );
   }
 
-  const pending = data?.achievements.filter((a) => a.claimable) ?? [];
-  const claimed = data?.achievements.filter(
-    (a) => a.status === "claimed" && a.claimMode !== "badge"
-  ) ?? [];
-  const badges = data?.achievements.filter((a) => a.claimMode === "badge") ?? [];
-  const failed = data?.achievements.filter((a) => a.status === "failed") ?? [];
+  if (error || !data) {
+    return (
+      <>
+        <main className="home-perfil flex flex-1 flex-col items-center justify-center px-6 text-center safe-top">
+          <p className="font-display font-bold text-h-muted">{error ?? t.common.error}</p>
+          <button
+            type="button"
+            onClick={() => void load()}
+            className="btn-chunky mt-6 rounded-2xl bg-prosperity px-8 py-4 font-display font-bold text-h-background"
+          >
+            {t.common.retry}
+          </button>
+        </main>
+        <BottomNav variant="perfil" />
+      </>
+    );
+  }
 
   return (
     <div className="home-perfil flex min-h-dvh flex-col">
@@ -134,141 +163,175 @@ export default function AchievementsPage() {
           <LanguageToggle variant="perfil" />
           <ProfileMenu
             isAdmin={isAdmin}
-            username={meData?.user.username ?? "..."}
-            walletAddress={meData?.user.walletAddress ?? ""}
+            username={data.username}
+            walletAddress={data.walletAddress}
+            variant="perfil"
           />
         </div>
       </header>
 
       <main className="flex-1 px-4 pb-28">
-        {loading ? (
-          <p className="py-12 text-center text-sm text-h-muted">{t.common.loading}</p>
-        ) : error ? (
-          <div className="rounded-2xl bg-danger/10 p-4 text-center text-sm text-danger ring-1 ring-danger/20">
-            {error}
-            <button
-              type="button"
-              onClick={() => void load()}
-              className="mt-3 block w-full font-semibold underline"
-            >
-              {t.common.retry}
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {(data?.pendingCount ?? 0) > 0 && (
-              <div className="animate-card-pop rounded-2xl bg-lemon/15 p-4 ring-1 ring-lemon/30">
-                <div className="flex items-start gap-2">
-                  <div className="min-w-0 flex-1">
-                    <p className="flex items-center gap-2 font-display font-bold text-h-foreground">
-                      <Sparkles className="size-5 shrink-0 text-lemon" />
-                      {t.achievements.newUnlocked}
-                    </p>
-                    <p className="mt-1 text-sm text-h-muted">
-                      {t.achievements.newUnlockedBody}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setNftHelpOpen((open) => !open)}
-                    className={`grid size-9 shrink-0 place-items-center rounded-xl ring-1 transition-colors active:scale-95 ${
-                      nftHelpOpen
-                        ? "bg-surface text-h-foreground ring-h-border"
-                        : "bg-surface/80 text-h-muted ring-h-border hover:text-h-foreground"
-                    }`}
-                    aria-label={t.achievements.nftHelpAria}
-                    aria-expanded={nftHelpOpen}
-                  >
-                    <HelpCircle className="size-5" />
-                  </button>
-                </div>
-                {nftHelpOpen && (
+        <section className="mb-4 grid grid-cols-3 gap-3">
+          <StatCard
+            icon={<Flame className="size-5 animate-flame fill-flame text-flame" />}
+            value={data.participationStreak > 0 ? `${data.participationStreak}` : "—"}
+            label={t.medals.participationStreak}
+            valueClass={data.participationStreak > 0 ? "text-flame" : "text-h-foreground/40"}
+          />
+          <StatCard
+            icon={<CalendarDays className="size-5 text-prosperity" />}
+            value={data.totalWeeksParticipated > 0 ? `${data.totalWeeksParticipated}` : "—"}
+            label={t.medals.totalWeeks}
+            valueClass={
+              data.totalWeeksParticipated > 0 ? "text-h-foreground" : "text-h-foreground/40"
+            }
+          />
+          <StatCard
+            icon={<Award className="size-5 fill-lemon/30 text-lemon" />}
+            value={data.achievements.length > 0 ? `${data.achievements.length}` : "—"}
+            label={t.medals.earned}
+            valueClass={data.achievements.length > 0 ? "text-lemon" : "text-h-foreground/40"}
+          />
+        </section>
+
+        <WalletRow
+          walletAddress={data.walletAddress}
+          label={t.home.walletConnected}
+          copiedLabel={t.home.copied}
+        />
+
+        <div className="mt-5 grid grid-cols-2 gap-1.5 rounded-2xl border border-h-border/60 bg-surface p-1.5 text-sm font-semibold">
+          <button
+            type="button"
+            onClick={() => setTab("badges")}
+            className={`rounded-xl py-2.5 transition-all ${
+              tab === "badges"
+                ? "border border-lemon/40 bg-gradient-to-b from-lemon/30 to-lemon/10 text-h-foreground"
+                : "text-h-muted hover:text-h-foreground"
+            }`}
+          >
+            {t.achievements.tabBadges}
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab("history")}
+            className={`rounded-xl py-2.5 transition-all ${
+              tab === "history"
+                ? "border border-lemon/40 bg-gradient-to-b from-lemon/30 to-lemon/10 text-h-foreground"
+                : "text-h-muted hover:text-h-foreground"
+            }`}
+          >
+            {t.achievements.tabHistory}
+          </button>
+        </div>
+
+        {tab === "badges" ? (
+          <Section title={t.medals.achievements} icon={<Award className="size-4 text-lemon" />}>
+            {data.achievements.length === 0 ? (
+              <EmptyState message={t.medals.noAchievements} />
+            ) : (
+              <div className="flex flex-col gap-2">
+                {data.achievements.map((a) => (
                   <article
-                    role="dialog"
-                    aria-label={t.achievements.nftHelpAria}
-                    className="mt-3 overflow-hidden rounded-2xl bg-surface ring-1 ring-h-border"
+                    key={a.id}
+                    className="flex items-center gap-3 rounded-2xl bg-surface px-4 py-3 ring-1 ring-h-border card-depth-sm"
                   >
-                    <div className="relative p-4">
-                      <button
-                        type="button"
-                        onClick={() => setNftHelpOpen(false)}
-                        className="absolute right-3 top-3 grid size-8 place-items-center rounded-lg text-h-muted transition-colors hover:bg-h-background hover:text-h-foreground"
-                        aria-label={t.achievements.modalClose}
-                      >
-                        <X className="size-4" />
-                      </button>
-                      <p className="pr-10 text-sm leading-relaxed text-h-muted">
-                        {t.achievements.nftHelpBody}
+                    <AchievementImageButton
+                      image={a.image}
+                      emoji={a.emoji}
+                      title={a.title}
+                      description={a.description}
+                      size="sm"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-display font-bold text-h-foreground">
+                        {a.title}
+                      </p>
+                      <p className="text-xs font-semibold text-h-muted">{a.description}</p>
+                      {a.seasonLabel && <AchievementSeasonLabel label={a.seasonLabel} />}
+                      <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-prosperity">
+                        {t.achievements.statusEarned}
                       </p>
                     </div>
                   </article>
-                )}
+                ))}
               </div>
             )}
-
-            <AchievementSection
-              title={t.achievements.available}
-              empty={t.achievements.noAvailable}
-              items={pending}
-              renderAction={(a) => (
-                <button
-                  type="button"
-                  disabled={claiming === a.type}
-                  onClick={() => void handleClaim(a.type)}
-                  className="btn-chunky flex w-full items-center justify-center gap-2 rounded-xl bg-lemon py-3 font-display text-sm font-bold text-h-background disabled:opacity-60"
-                >
-                  <Gift className="size-4" />
-                  {claiming === a.type
-                    ? t.achievements.claiming
-                    : t.achievements.claim}
-                </button>
-              )}
-              statusLabel={t.achievements.statusAvailable}
-            />
-
-            <AchievementSection
-              title={t.achievements.claimed}
-              empty={t.achievements.noClaimed}
-              items={claimed}
-              statusLabel={t.achievements.statusClaimed}
-              showExplorer
-            />
-
-            {badges.length > 0 && (
-              <AchievementSection
-                title={t.achievements.badges}
-                empty=""
-                items={badges}
-                statusLabel={t.achievements.statusBadge}
-              />
-            )}
-
-            {failed.length > 0 && (
-              <AchievementSection
-                title={t.achievements.failed}
-                empty=""
-                items={failed}
-                statusLabel={t.achievements.statusFailed}
-                renderAction={(a) => (
-                  <button
-                    type="button"
-                    disabled={claiming === a.type}
-                    onClick={() => void handleClaim(a.type)}
-                    className="mt-2 w-full rounded-xl bg-prosperity/15 py-2 text-sm font-semibold text-prosperity ring-1 ring-prosperity/30"
-                  >
-                    {t.achievements.retryClaim}
-                  </button>
-                )}
-              />
-            )}
-
-            <Link
-              href="/medals"
-              className="block rounded-2xl bg-surface py-3 text-center text-sm font-semibold text-h-muted ring-1 ring-h-border"
+          </Section>
+        ) : (
+          <>
+            <Section
+              title={t.medals.competitionHistory}
+              icon={<Star className="size-4 fill-prosperity/30 text-prosperity" />}
             >
-              {t.achievements.viewHistory}
-            </Link>
-          </div>
+              {data.seasonHistory.length === 0 ? (
+                <EmptyState message={t.medals.noHistory} />
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {data.seasonHistory.map((h) => (
+                    <div
+                      key={h.season.weekKey}
+                      className="flex items-center justify-between rounded-2xl bg-surface px-4 py-3 ring-1 ring-h-border card-depth-sm"
+                    >
+                      <div className="min-w-0">
+                        <p className="font-display font-bold text-h-foreground">
+                          {t.medals.season} {formatWeek(h.season.startDate, locale)}
+                        </p>
+                        <p className="mt-0.5 flex items-center gap-2 text-xs font-semibold text-h-muted">
+                          <span className="flex items-center gap-0.5 text-prosperity">
+                            <Star className="size-3 fill-prosperity/30" />
+                            {h.xp} XP
+                          </span>
+                          <span className="flex items-center gap-0.5">
+                            <Clock className="size-3" />
+                            {formatDurationMs(h.durationMs)}
+                          </span>
+                        </p>
+                      </div>
+                      <span
+                        className={`shrink-0 rounded-full px-3 py-1 text-sm font-black ${
+                          h.rank <= 3
+                            ? "bg-lemon/20 text-lemon ring-1 ring-lemon/40"
+                            : "bg-h-background text-h-foreground ring-1 ring-h-border"
+                        }`}
+                      >
+                        {RANK_MEDALS[h.rank - 1] ?? `#${h.rank}`}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Section>
+
+            <Section
+              title={t.medals.dailyHistory}
+              icon={<CalendarDays className="size-4 text-prosperity" />}
+            >
+              {data.dailyHistory.length === 0 ? (
+                <EmptyState message={t.medals.noDailyHistory} />
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {data.dailyHistory.map((d) => (
+                    <div
+                      key={d.date}
+                      className="flex items-center justify-between rounded-2xl bg-surface px-4 py-3 ring-1 ring-h-border card-depth-sm"
+                    >
+                      <div className="min-w-0">
+                        <p className="font-display font-bold text-h-foreground">{d.date}</p>
+                        <p className="mt-0.5 text-xs font-semibold text-h-muted">
+                          {d.xpEarned} XP · {formatDurationMs(d.durationMs ?? 0)}
+                          {d.lifeRefillUsed ? " · ⚡ refill" : ""}
+                        </p>
+                      </div>
+                      <span className="text-xl">
+                        {d.result === "completed" ? "✅" : "💔"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Section>
+          </>
         )}
       </main>
 
@@ -277,90 +340,107 @@ export default function AchievementsPage() {
   );
 }
 
-function AchievementSection({
+function Section({
   title,
-  empty,
-  items,
-  statusLabel,
-  showExplorer,
-  renderAction,
+  icon,
+  children,
 }: {
   title: string;
-  empty: string;
-  items: AchievementItem[];
-  statusLabel: string;
-  showExplorer?: boolean;
-  renderAction?: (item: AchievementItem) => ReactNode;
+  icon: ReactNode;
+  children: ReactNode;
 }) {
-  if (items.length === 0) {
-    if (!empty) return null;
-    return (
-      <section>
-        <h2 className="mb-3 font-display text-lg font-bold">{title}</h2>
-        <p className="rounded-2xl bg-surface p-4 text-sm text-h-muted ring-1 ring-h-border">
-          {empty}
-        </p>
-      </section>
-    );
+  return (
+    <section className="mt-6">
+      <h2 className="mb-3 flex items-center gap-2 font-display text-lg font-bold text-h-foreground">
+        {icon}
+        {title}
+      </h2>
+      {children}
+    </section>
+  );
+}
+
+function StatCard({
+  icon,
+  value,
+  label,
+  valueClass,
+}: {
+  icon: ReactNode;
+  value: string;
+  label: string;
+  valueClass?: string;
+}) {
+  return (
+    <div className="rounded-2xl bg-surface p-3 text-center ring-1 ring-h-border card-depth-sm">
+      <div className="mx-auto mb-1.5 grid size-8 place-items-center">{icon}</div>
+      <p className={`font-display text-lg font-bold ${valueClass ?? "text-h-foreground"}`}>
+        {value}
+      </p>
+      <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-h-muted">
+        {label}
+      </p>
+    </div>
+  );
+}
+
+function WalletRow({
+  walletAddress,
+  label,
+  copiedLabel,
+}: {
+  walletAddress: string;
+  label: string;
+  copiedLabel: string;
+}) {
+  const [copied, setCopied] = useState(false);
+  const short =
+    walletAddress.length > 42
+      ? `${walletAddress.slice(0, 38)}...`
+      : walletAddress;
+
+  function handleCopy() {
+    navigator.clipboard?.writeText(walletAddress);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
   }
 
   return (
-    <section>
-      <h2 className="mb-3 font-display text-lg font-bold">{title}</h2>
-      <div className="space-y-3">
-        {items.map((a) => (
-          <article
-            key={a.id}
-            className="overflow-hidden rounded-2xl bg-surface ring-1 ring-h-border"
-          >
-            <div className="flex gap-3 p-4">
-              <AchievementImageButton
-                image={a.image}
-                emoji={a.emoji}
-                title={a.title}
-                description={a.description}
-                size="md"
-              />
-              <div className="min-w-0 flex-1">
-                <p className="font-display font-bold">{a.title}</p>
-                <p className="mt-0.5 text-xs text-h-muted">{a.description}</p>
-                {a.seasonLabel && <AchievementSeasonLabel label={a.seasonLabel} />}
-                <p className="mt-2 text-[10px] font-bold uppercase tracking-wide text-prosperity">
-                  {statusLabel}
-                </p>
-                {a.mintedAt && (
-                  <p className="mt-1 flex items-center gap-1 text-[10px] text-h-muted">
-                    <Clock className="size-3" />
-                    {new Date(a.mintedAt).toLocaleDateString()}
-                  </p>
-                )}
-                {showExplorer && a.explorerUrl && (
-                  <a
-                    href={a.explorerUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-prosperity"
-                  >
-                    <ExternalLink className="size-3" />
-                    CeloScan
-                  </a>
-                )}
-                {a.status === "claimed" && a.nftTokenId && (
-                  <p className="mt-1 flex items-center gap-1 text-[10px] text-h-muted">
-                    <CheckCircle2 className="size-3 text-prosperity" />
-                    NFT #{a.nftTokenId}
-                  </p>
-                )}
-              </div>
-            </div>
-            {renderAction && (
-              <div className="border-t border-h-border px-4 py-3">
-                {renderAction(a)}
-              </div>
-            )}
-          </article>
-        ))}
+    <section className="mb-2 flex items-center gap-3 rounded-2xl bg-prosperity/10 p-3 ring-1 ring-prosperity/20">
+      <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-prosperity/20 text-prosperity">
+        <ShieldCheck className="size-5" />
       </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-xs font-semibold text-prosperity">{label}</p>
+        <p className="truncate font-mono text-[11px] text-h-muted">{short}</p>
+      </div>
+      <button
+        type="button"
+        onClick={handleCopy}
+        aria-label="Copy address"
+        className="grid size-8 shrink-0 place-items-center rounded-lg text-h-muted transition-colors hover:text-prosperity active:scale-90"
+      >
+        <Copy className="size-4" />
+      </button>
+      {copied && (
+        <span className="text-[10px] font-semibold text-prosperity">{copiedLabel}</span>
+      )}
     </section>
   );
+}
+
+function EmptyState({ message }: { message: string }) {
+  return (
+    <p className="rounded-2xl bg-surface px-4 py-8 text-center text-sm font-semibold text-h-muted ring-1 ring-h-border">
+      {message}
+    </p>
+  );
+}
+
+function formatWeek(iso: string, locale: string) {
+  const loc = locale === "en" ? "en-US" : "es-ES";
+  return new Date(iso).toLocaleDateString(loc, {
+    month: "short",
+    day: "numeric",
+  });
 }

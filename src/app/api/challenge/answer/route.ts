@@ -3,7 +3,6 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/session";
 import {
   MAX_DAILY_XP,
-  QUESTIONS_PER_DAY,
   XP_PER_CORRECT,
   todayKey,
   type AnswerRecord,
