@@ -36,13 +36,13 @@ En **Project → Settings → Environment Variables**, añade todo lo de `.env.e
 En Supabase: **Project Settings → Database → Connection string**
 
 - **DATABASE_URL** → *Transaction pooler* + `?pgbouncer=true` (y suele añadirse `connection_limit=1` en Vercel)
-- **DIRECT_URL** → *Direct connection* (para `migrate deploy` en el build)
+- **DIRECT_URL** → *Session pooler* puerto **5432** en el mismo host `pooler.supabase.com` (Vercel no alcanza bien `db.xxx.supabase.co` por IPv6). Solo usa `db.xxx.supabase.co` en local si quieres.
 
 Ejemplo (sustituye password y host del pooler):
 
 ```env
-DATABASE_URL="postgresql://postgres.fcecrahllkwyjycstbis:PASSWORD@aws-0-xxx.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1"
-DIRECT_URL="postgresql://postgres:PASSWORD@db.fcecrahllkwyjycstbis.supabase.co:5432/postgres?sslmode=require"
+DATABASE_URL="postgresql://postgres.fcecrahllkwyjycstbis:PASSWORD@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1&sslmode=require"
+DIRECT_URL="postgresql://postgres.fcecrahllkwyjycstbis:PASSWORD@aws-1-us-east-2.pooler.supabase.com:5432/postgres?sslmode=require"
 ```
 
 ### Red Celo (testnet)
