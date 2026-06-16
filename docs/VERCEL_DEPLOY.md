@@ -81,7 +81,17 @@ RECOVERY_DEMO_MODE=false
 NEXT_PUBLIC_RECOVERY_DEMO_MODE=false
 ```
 
-**No** definas `ALLOW_DAILY_CHALLENGE_RETRY` en Vercel (en producción queda desactivado aunque exista).
+**No** definas `ALLOW_DAILY_CHALLENGE_RETRY` en producción pública salvo demos controladas (ver abajo).
+
+### Demo en Vercel (repetir reto del día)
+
+Solo para presentaciones, añade en **Environment Variables → Production**:
+
+```env
+ALLOW_DAILY_CHALLENGE_RETRY=true
+```
+
+Luego **Redeploy**. Permite volver a jugar el reto del mismo día sin esperar al reinicio. Quítala cuando la app esté abierta al público.
 
 ### URL de la app
 

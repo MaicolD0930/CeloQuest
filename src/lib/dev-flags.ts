@@ -1,6 +1,5 @@
-/** Temporary flag — disabled in production even if env is set. */
+/** When ALLOW_DAILY_CHALLENGE_RETRY=true, replay today's challenge (for local dev or demo deploys). */
 export function allowDailyChallengeRetry(): boolean {
-  if (process.env.NODE_ENV === "production") return false;
   return process.env.ALLOW_DAILY_CHALLENGE_RETRY === "true";
 }
 
