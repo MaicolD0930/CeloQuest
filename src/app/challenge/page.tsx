@@ -96,7 +96,6 @@ export default function ChallengePage() {
   const [introDismissed, setIntroDismissed] = useState(false);
   const [startedAt, setStartedAt] = useState<string | null>(null);
   const [durationOffset, setDurationOffset] = useState(0);
-  const [timerPaused, setTimerPaused] = useState(false);
   const [recoveryTokens, setRecoveryTokens] = useState<RecoveryToken[]>(["tCOPM"]);
   const [selectedToken, setSelectedToken] = useState<RecoveryToken>("tCOPM");
   const [tokenBalance, setTokenBalance] = useState<string | null>(null);
@@ -174,14 +173,12 @@ export default function ChallengePage() {
     setCanRefill(!!data.progress.canRefill);
     if (data.progress.startedAt) setStartedAt(data.progress.startedAt);
     setDurationOffset(data.progress.activeDurationMs ?? 0);
-    setTimerPaused(!!data.progress.timerPaused);
     if (answers.length > 0) setIntroDismissed(true);
 
     const shouldSyncTimer =
       answers.length > 0 &&
       !data.progress.awaitingRefill &&
-      !data.progress.completed &&
-      !data.progress.timerPaused;
+      !data.progress.completed;
     if (shouldSyncTimer) {
       await syncChallengeTimer();
     }
@@ -197,14 +194,10 @@ export default function ChallengePage() {
       const data = (await res.json()) as {
         startedAt?: string;
         activeDurationMs?: number;
-        timerPaused?: boolean;
       };
       if (data.startedAt) setStartedAt(data.startedAt);
       if (typeof data.activeDurationMs === "number") {
         setDurationOffset(data.activeDurationMs);
-      }
-      if (typeof data.timerPaused === "boolean") {
-        setTimerPaused(data.timerPaused);
       }
     } catch {
       /* keep progress values from /today */
@@ -285,23 +278,23 @@ export default function ChallengePage() {
     !awaitingRefill &&
     !introDismissed;
 
+  const isTimerFrozen = !!summary || awaitingRefill || !!feedback;
+
   const timerActive =
     !loading &&
     !showIntro &&
     !summary &&
     !alreadyDone &&
     questions.length > 0 &&
-    (!!question || !!feedback || awaitingRefill) &&
-    !timerPaused;
-
-  const timerPausedNow = timerPaused || !!summary || !!feedback;
+    !!question &&
+    !isTimerFrozen;
 
   const elapsedMs = useChallengeElapsed(
     startedAt,
     durationOffset,
     awaitingRefill ? "awaiting_refill" : "in_progress",
-    timerPausedNow,
-    timerActive && !feedback
+    isTimerFrozen,
+    timerActive
   );
 
   const displayElapsedMs =
@@ -364,21 +357,14 @@ export default function ChallengePage() {
         setSummary(data.summary);
         if (data.summary.durationMs != null) {
           setDurationOffset(data.summary.durationMs);
-          setTimerPaused(true);
         }
       } else if (typeof data.activeDurationMs === "number") {
         setDurationOffset(data.activeDurationMs);
-        if (data.timerPaused) {
-          setTimerPaused(true);
-        } else {
-          setTimerPaused(false);
-        }
       }
       if (data.startedAt) setStartedAt(data.startedAt);
       if (data.awaitingRefill) {
         setAwaitingRefill(true);
         setCanRefill(data.canRefill);
-        setTimerPaused(true);
       } else {
         setAwaitingRefill(false);
       }
@@ -528,7 +514,6 @@ export default function ChallengePage() {
       setLivesLeft(data.livesLeft);
       setAwaitingRefill(false);
       setCanRefill(false);
-      setTimerPaused(false);
       if (data.startedAt) setStartedAt(data.startedAt);
       if (typeof data.activeDurationMs === "number") {
         setDurationOffset(data.activeDurationMs);
@@ -556,7 +541,6 @@ export default function ChallengePage() {
         });
         if (data.summary.durationMs != null) {
           setDurationOffset(data.summary.durationMs);
-          setTimerPaused(true);
         }
         setAwaitingRefill(false);
       }
@@ -651,7 +635,7 @@ export default function ChallengePage() {
             livesLabel={`0 ${t.challenge.livesAvailable}`}
             earnedLabel={`+${xpEarned} XP ${t.challenge.earnedSoFar}`}
             elapsedMs={displayElapsedMs}
-            timerPaused={timerPaused}
+            timerPaused
             timeLabel={t.challenge.elapsedTime}
             recoverLabel={t.challenge.recoverEnergy}
             refillNote={`$${recoveryPriceUsd.toFixed(2)} USD${copPerUsd ? ` · 1 USD = ${Number(copPerUsd).toLocaleString()} COP` : ""} · ${t.challenge.oneRefillPerDay}`}
@@ -772,16 +756,16 @@ export default function ChallengePage() {
           {startedAt && (
             <div
               className={`flex shrink-0 items-center gap-1 rounded-xl bg-surface px-2.5 py-1.5 ring-1 ${
-                timerPaused ? "ring-h-border opacity-80" : "ring-prosperity/30"
+                isTimerFrozen ? "ring-h-border opacity-80" : "ring-prosperity/30"
               }`}
             >
-              <Clock className={`size-3.5 ${timerPaused ? "text-h-muted" : "text-prosperity"}`} />
+              <Clock className={`size-3.5 ${isTimerFrozen ? "text-h-muted" : "text-prosperity"}`} />
               <span
                 className={`font-mono text-xs font-bold tabular-nums ${
-                  timerPaused ? "text-h-muted" : "text-prosperity"
+                  isTimerFrozen ? "text-h-muted" : "text-prosperity"
                 }`}
               >
-                {timerPaused ? "⏸ " : ""}
+                {isTimerFrozen ? "⏸ " : ""}
                 {formatTimerLive(displayElapsedMs)}
               </span>
             </div>
@@ -896,7 +880,7 @@ export default function ChallengePage() {
             {startedAt && (
               <p className="mt-1 flex items-center gap-1.5 px-3 text-xs font-semibold text-h-muted">
                 <Clock className="size-3.5 text-prosperity" />
-                {timerPaused ? "⏸ " : ""}
+                {isTimerFrozen ? "⏸ " : ""}
                 {t.challenge.elapsedTime}:{" "}
                 <span className="font-mono text-prosperity">
                   {formatDurationMs(displayElapsedMs)}
