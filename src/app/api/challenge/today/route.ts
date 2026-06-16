@@ -71,15 +71,13 @@ export async function GET(req: NextRequest) {
         startedAt: segment.startedAt,
         durationMs: segment.durationMs,
       };
-      void prisma.dailyAttempt
-        .update({
-          where: { id: attempt.id },
-          data: {
-            startedAt: segment.startedAt,
-            durationMs: segment.durationMs,
-          },
-        })
-        .catch((err) => console.error("[challenge/today] timer persist:", err));
+      await prisma.dailyAttempt.update({
+        where: { id: attempt.id },
+        data: {
+          startedAt: segment.startedAt,
+          durationMs: segment.durationMs,
+        },
+      });
     }
 
     const questionIds: string[] = JSON.parse(attempt.questionIds);

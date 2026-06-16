@@ -23,7 +23,7 @@ import { ChallengeCompletedCard } from "@/components/ChallengeCompletedCard";
 import { CategoryBadge } from "@/components/CategoryBadge";
 import { ChallengeSkeleton } from "@/components/skeletons/PageSkeletons";
 import { formatDurationMs, formatTimerLive } from "@/lib/format";
-import { getAttemptElapsedMs, capAttemptDurationMs } from "@/lib/challenge-timer";
+import { getAttemptElapsedMs, capAttemptDurationMs, repairInflatedDurationMs } from "@/lib/challenge-timer";
 import { invalidateMeCache } from "@/lib/client/me-cache";
 import {
   fetchChallengeToday,
@@ -172,36 +172,24 @@ export default function ChallengePage() {
     setAwaitingRefill(!!data.progress.awaitingRefill);
     setCanRefill(!!data.progress.canRefill);
     if (data.progress.startedAt) setStartedAt(data.progress.startedAt);
-    setDurationOffset(data.progress.activeDurationMs ?? 0);
+    setDurationOffset(
+      repairInflatedDurationMs(
+        data.progress.activeDurationMs ?? 0,
+        data.progress.awaitingRefill ? "awaiting_refill" : "in_progress",
+        answers.length,
+        !!data.progress.completed
+      )
+    );
     if (answers.length > 0) setIntroDismissed(true);
-
-    const shouldSyncTimer =
-      answers.length > 0 &&
-      !data.progress.awaitingRefill &&
-      !data.progress.completed;
-    if (shouldSyncTimer) {
-      await syncChallengeTimer();
-    }
   }
 
-  async function syncChallengeTimer() {
-    try {
-      const res = await fetch("/api/challenge/start-timer", {
-        method: "POST",
-        credentials: "include",
-      });
-      if (!res.ok) return;
-      const data = (await res.json()) as {
-        startedAt?: string;
-        activeDurationMs?: number;
-      };
-      if (data.startedAt) setStartedAt(data.startedAt);
-      if (typeof data.activeDurationMs === "number") {
-        setDurationOffset(data.activeDurationMs);
-      }
-    } catch {
-      /* keep progress values from /today */
-    }
+  function applyDurationFromServer(
+    ms: number,
+    answerCount: number,
+    result: string,
+    completed: boolean
+  ) {
+    setDurationOffset(repairInflatedDurationMs(ms, result, answerCount, completed));
   }
   async function loadChallenge(force = false) {
     setLoadError(null);
@@ -314,7 +302,7 @@ export default function ChallengePage() {
         };
         if (data.startedAt) setStartedAt(data.startedAt);
         if (typeof data.activeDurationMs === "number") {
-          setDurationOffset(data.activeDurationMs);
+          applyDurationFromServer(data.activeDurationMs, 0, "in_progress", false);
         }
       } else {
         setStartedAt(new Date().toISOString());
@@ -359,7 +347,12 @@ export default function ChallengePage() {
           setDurationOffset(data.summary.durationMs);
         }
       } else if (typeof data.activeDurationMs === "number") {
-        setDurationOffset(data.activeDurationMs);
+        applyDurationFromServer(
+          data.activeDurationMs,
+          currentIndex + 1,
+          data.awaitingRefill ? "awaiting_refill" : "in_progress",
+          false
+        );
       }
       if (data.startedAt) setStartedAt(data.startedAt);
       if (data.awaitingRefill) {

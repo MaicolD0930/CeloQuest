@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/session";
 import { todayKey } from "@/lib/game";
-import { resumeAttemptTimerSegment } from "@/lib/challenge-timer";
+import {
+  repairInflatedDurationMs,
+  resumeAttemptTimerSegment,
+} from "@/lib/challenge-timer";
 
 /** Reset the active timer segment when the player actually starts playing. */
 export async function POST() {
@@ -27,7 +30,17 @@ export async function POST() {
     });
   }
 
-  const segment = resumeAttemptTimerSegment(attempt);
+  const answerCount = JSON.parse(attempt.answers).length;
+  const repairedMs = repairInflatedDurationMs(
+    attempt.durationMs,
+    attempt.result,
+    answerCount,
+    !!attempt.completedAt
+  );
+  const segment = resumeAttemptTimerSegment({
+    ...attempt,
+    durationMs: repairedMs,
+  });
   const updated = await prisma.dailyAttempt.update({
     where: { id: attempt.id },
     data: {

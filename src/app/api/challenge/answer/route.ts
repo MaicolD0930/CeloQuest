@@ -11,6 +11,7 @@ import { safeSeasonSync } from "@/lib/seasons";
 import { finalizeDailyAttempt } from "@/lib/attempts";
 import {
   pauseAttemptElapsedMs,
+  repairInflatedDurationMs,
 } from "@/lib/challenge-timer";
 import { allowDailyChallengeRetry } from "@/lib/dev-flags";
 import { maybeResetCompletedAttempt } from "@/lib/challenge-retry";
@@ -79,7 +80,18 @@ export async function POST(req: NextRequest) {
     await maybeAwardFirstCeloLearning(user.id, locale);
   }
 
+  const answersBefore = answers.length;
   answers.push({ questionId, answerIndex, correct });
+
+  const timerAttempt = {
+    ...attempt,
+    durationMs: repairInflatedDurationMs(
+      attempt.durationMs,
+      attempt.result,
+      answersBefore,
+      !!attempt.completedAt
+    ),
+  };
 
   const allAnswered = answers.length >= questionIds.length;
   const lostLastLife = livesLeft <= 0 && !allAnswered;
@@ -115,12 +127,12 @@ export async function POST(req: NextRequest) {
 
   if (!shouldFinalize) {
     updateData.completedAt = null;
-    updateData.durationMs = pauseAttemptElapsedMs(attempt);
+    updateData.durationMs = pauseAttemptElapsedMs(timerAttempt);
     if (result !== "awaiting_refill") {
       updateData.startedAt = new Date();
     }
   } else {
-    updateData.durationMs = pauseAttemptElapsedMs(attempt);
+    updateData.durationMs = pauseAttemptElapsedMs(timerAttempt);
   }
 
   const updatedAttempt = await prisma.dailyAttempt.update({
