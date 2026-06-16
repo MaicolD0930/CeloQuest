@@ -21,7 +21,7 @@ export function formatTimerLive(ms: number) {
   const totalSec = Math.max(0, Math.floor(ms / 1000));
   const min = Math.floor(totalSec / 60);
   const sec = totalSec % 60;
-  return `${min}:${sec.toString().padStart(2, "0")}`;
+  return `${min.toString().padStart(2, "0")}:${sec.toString().padStart(2, "0")}`;
 }
 
 /** Hours and minutes until a UTC end timestamp (season countdown). */

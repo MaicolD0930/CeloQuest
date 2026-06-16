@@ -23,11 +23,11 @@ import { ChallengeCompletedCard } from "@/components/ChallengeCompletedCard";
 import { CategoryBadge } from "@/components/CategoryBadge";
 import { ChallengeSkeleton } from "@/components/skeletons/PageSkeletons";
 import { formatDurationMs, formatTimerLive } from "@/lib/format";
+import { getAttemptElapsedMs, capAttemptDurationMs } from "@/lib/challenge-timer";
 import { invalidateMeCache } from "@/lib/client/me-cache";
 import {
   fetchChallengeToday,
   invalidateChallengeCache,
-  peekChallengeCache,
   type ChallengeTodayResponse,
 } from "@/lib/client/challenge-cache";
 import { WalletPicker } from "@/components/WalletPicker";
@@ -177,7 +177,6 @@ export default function ChallengePage() {
     setTimerPaused(!!data.progress.timerPaused);
     if (answers.length > 0) setIntroDismissed(true);
   }
-
   async function loadChallenge(force = false) {
     setLoadError(null);
     try {
@@ -236,14 +235,8 @@ export default function ChallengePage() {
   }, [awaitingRefill]);
 
   useEffect(() => {
-    const cached = peekChallengeCache(locale);
-    if (cached) {
-      void applyChallengeData(cached);
-      setLoading(false);
-    } else {
-      setLoading(true);
-    }
-    void loadChallenge()
+    setLoading(true);
+    void loadChallenge(true)
       .catch(() => setLoadError(t.common.error))
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -268,11 +261,14 @@ export default function ChallengePage() {
     (!!question || !!feedback || awaitingRefill) &&
     !timerPaused;
 
+  const timerPausedNow = timerPaused || !!summary || !!feedback;
+
   const elapsedMs = useChallengeElapsed(
     startedAt,
     durationOffset,
-    timerPaused || !!summary,
-    timerActive || timerPaused || !!feedback
+    awaitingRefill ? "awaiting_refill" : "in_progress",
+    timerPausedNow,
+    timerActive && !feedback
   );
 
   const displayElapsedMs =
@@ -1336,30 +1332,27 @@ function StatCard({
 function useChallengeElapsed(
   startedAt: string | null,
   durationOffset: number,
+  result: string,
   paused: boolean,
   active: boolean
 ) {
-  const [elapsed, setElapsed] = useState(durationOffset);
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
-    if (!active) {
-      setElapsed(durationOffset);
-      return;
-    }
-    if (paused) {
-      setElapsed(durationOffset);
-      return;
-    }
-    if (!startedAt) {
-      setElapsed(durationOffset);
-      return;
-    }
-    const segmentStart = new Date(startedAt).getTime();
-    const tick = () => setElapsed(durationOffset + Date.now() - segmentStart);
-    tick();
-    const id = setInterval(tick, 1000);
+    if (!active || paused || !startedAt) return;
+    setNow(Date.now());
+    const id = setInterval(() => setNow(Date.now()), 250);
     return () => clearInterval(id);
   }, [startedAt, durationOffset, paused, active]);
 
-  return elapsed;
+  if (!startedAt || paused || !active) {
+    return capAttemptDurationMs(durationOffset);
+  }
+
+  return getAttemptElapsedMs({
+    startedAt,
+    durationMs: durationOffset,
+    result,
+    now,
+  });
 }

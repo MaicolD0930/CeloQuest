@@ -11,6 +11,7 @@ import { buildDailyQuestionIds } from "@/lib/questions/daily";
 import { safeSeasonSync } from "@/lib/seasons";
 import {
   getAttemptElapsedMs,
+  pauseAttemptElapsedMs,
   resumeAttemptTimerSegment,
 } from "@/lib/challenge-timer";
 import { maybeResetCompletedAttempt, repairDailyAttempt } from "@/lib/challenge-retry";
@@ -54,7 +55,11 @@ export async function GET(req: NextRequest) {
     attempt = await repairDailyAttempt(attempt, user);
 
     if (attempt.result === "in_progress" && !attempt.completedAt) {
-      const segment = resumeAttemptTimerSegment(attempt);
+      const frozenMs = pauseAttemptElapsedMs(attempt);
+      const segment = resumeAttemptTimerSegment({
+        ...attempt,
+        durationMs: frozenMs,
+      });
       attempt = {
         ...attempt,
         startedAt: segment.startedAt,
