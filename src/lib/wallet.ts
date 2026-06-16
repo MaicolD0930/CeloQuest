@@ -21,6 +21,7 @@ import {
   hasSufficientCopmBalance,
 } from "@/lib/tokens/tcopm";
 import {
+  assertProviderOnActiveChain,
   discoverWalletProviders,
   ensureCorrectChain,
   hasAnyWalletInstalled,
@@ -194,7 +195,12 @@ export async function sendRecoveryPayment(
   const required = BigInt(prepared.recoveryPrice);
 
   const provider = resolveWalletProvider(providerId);
-  await ensureCorrectChain(provider);
+  const miniPayPay = providerId === "minipay" || isMiniPay();
+  if (miniPayPay) {
+    await assertProviderOnActiveChain(provider);
+  } else {
+    await ensureCorrectChain(provider);
+  }
 
   const walletClient = createWalletClient({
     chain: getActiveChain(),

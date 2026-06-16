@@ -396,7 +396,7 @@ export default function ChallengePage() {
         case "USER_REJECTED":
           return t.challenge.paymentRejected;
         case "WRONG_NETWORK":
-          return t.challenge.wrongNetwork;
+          return miniPay ? t.challenge.wrongNetworkMiniPay : t.challenge.wrongNetwork;
         case "WALLET_NOT_INSTALLED":
           return t.connect.walletNotInstalled;
         case "NO_WALLET":

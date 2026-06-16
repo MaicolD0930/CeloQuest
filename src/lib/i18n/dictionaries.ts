@@ -367,6 +367,8 @@ const es = {
       "La wallet activa no coincide con tu cuenta. Cambia a la cuenta con la que entraste",
     paymentRejected: "Cancelaste el pago en la wallet",
     wrongNetwork: "Cambia tu wallet a Celo Sepolia e intenta de nuevo",
+    wrongNetworkMiniPay:
+      "En MiniPay activa «Usar red de prueba» en Ajustes → Developer (Celo Sepolia). La app no puede cambiar la red por ti.",
     loadError: "No pudimos cargar las preguntas de hoy.",
     readyTitle: "¿Listo para el reto?",
     readySubtitle: "5 preguntas · 1 vida · gana XP",
@@ -809,6 +811,8 @@ const en: Dict = {
       "The active wallet does not match your account. Switch to the account you signed in with",
     paymentRejected: "You cancelled the payment in your wallet",
     wrongNetwork: "Switch your wallet to Celo Sepolia and try again",
+    wrongNetworkMiniPay:
+      "In MiniPay enable “Use Testnet” under Settings → Developer (Celo Sepolia). The app cannot switch networks for you.",
     loadError: "We couldn't load today's questions.",
     readyTitle: "Ready for the challenge?",
     readySubtitle: "5 questions · 1 life · earn XP",
