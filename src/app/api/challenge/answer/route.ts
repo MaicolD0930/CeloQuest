@@ -115,10 +115,8 @@ export async function POST(req: NextRequest) {
 
   if (!shouldFinalize) {
     updateData.completedAt = null;
-    if (result === "awaiting_refill") {
-      updateData.durationMs = pauseAttemptElapsedMs(attempt);
-    } else {
-      updateData.durationMs = pauseAttemptElapsedMs(attempt);
+    updateData.durationMs = pauseAttemptElapsedMs(attempt);
+    if (result !== "awaiting_refill") {
       updateData.startedAt = new Date();
     }
   } else {

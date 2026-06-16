@@ -176,6 +176,39 @@ export default function ChallengePage() {
     setDurationOffset(data.progress.activeDurationMs ?? 0);
     setTimerPaused(!!data.progress.timerPaused);
     if (answers.length > 0) setIntroDismissed(true);
+
+    const shouldSyncTimer =
+      answers.length > 0 &&
+      !data.progress.awaitingRefill &&
+      !data.progress.completed &&
+      !data.progress.timerPaused;
+    if (shouldSyncTimer) {
+      await syncChallengeTimer();
+    }
+  }
+
+  async function syncChallengeTimer() {
+    try {
+      const res = await fetch("/api/challenge/start-timer", {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) return;
+      const data = (await res.json()) as {
+        startedAt?: string;
+        activeDurationMs?: number;
+        timerPaused?: boolean;
+      };
+      if (data.startedAt) setStartedAt(data.startedAt);
+      if (typeof data.activeDurationMs === "number") {
+        setDurationOffset(data.activeDurationMs);
+      }
+      if (typeof data.timerPaused === "boolean") {
+        setTimerPaused(data.timerPaused);
+      }
+    } catch {
+      /* keep progress values from /today */
+    }
   }
   async function loadChallenge(force = false) {
     setLoadError(null);

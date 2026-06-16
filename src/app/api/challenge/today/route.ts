@@ -11,7 +11,7 @@ import { buildDailyQuestionIds } from "@/lib/questions/daily";
 import { safeSeasonSync } from "@/lib/seasons";
 import {
   getAttemptElapsedMs,
-  pauseAttemptElapsedMs,
+  repairInflatedDurationMs,
   resumeAttemptTimerSegment,
 } from "@/lib/challenge-timer";
 import { maybeResetCompletedAttempt, repairDailyAttempt } from "@/lib/challenge-retry";
@@ -55,10 +55,16 @@ export async function GET(req: NextRequest) {
     attempt = await repairDailyAttempt(attempt, user);
 
     if (attempt.result === "in_progress" && !attempt.completedAt) {
-      const frozenMs = pauseAttemptElapsedMs(attempt);
+      const answers: AnswerRecord[] = JSON.parse(attempt.answers);
+      const repairedMs = repairInflatedDurationMs(
+        attempt.durationMs,
+        attempt.result,
+        answers.length,
+        !!attempt.completedAt
+      );
       const segment = resumeAttemptTimerSegment({
         ...attempt,
-        durationMs: frozenMs,
+        durationMs: repairedMs,
       });
       attempt = {
         ...attempt,

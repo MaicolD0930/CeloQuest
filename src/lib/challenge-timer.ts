@@ -53,3 +53,18 @@ export function resumeAttemptTimerSegment(attempt: {
     startedAt: new Date(),
   };
 }
+
+/** Reset inflated duration stuck at the cap while the attempt is still in progress. */
+export function repairInflatedDurationMs(
+  durationMs: number | null,
+  result: string,
+  answerCount: number,
+  completed: boolean
+): number {
+  const ms = durationMs ?? 0;
+  if (completed || result !== "in_progress") return ms;
+  if (ms >= MAX_DAILY_ATTEMPT_DURATION_MS && answerCount < 5) {
+    return 0;
+  }
+  return ms;
+}
