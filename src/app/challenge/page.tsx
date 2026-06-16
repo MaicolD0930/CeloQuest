@@ -399,6 +399,12 @@ export default function ChallengePage() {
     if (apiError === "INVALID_PAYMENT") return t.challenge.refillInvalidPayment;
     if (apiError === "TX_FAILED") return t.challenge.refillTxFailed;
     if (apiError === "TX_NOT_FOUND") return t.challenge.refillTxNotFound;
+    if (apiError === "PAYMENT_NOT_CONFIGURED") {
+      return t.challenge.refillPaymentNotConfigured;
+    }
+    if (apiError === "TX_ALREADY_USED" || apiError === "REFILL_ALREADY_USED") {
+      return t.challenge.refillError;
+    }
     if (err instanceof Error) {
       switch (err.message) {
         case "USER_REJECTED":

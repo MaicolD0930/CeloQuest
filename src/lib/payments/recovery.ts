@@ -71,18 +71,25 @@ export async function verifyRecoveryPayment(
   });
 
   let receipt;
-  try {
-    receipt = await client.getTransactionReceipt({ hash: txHash });
-  } catch {
+  const delays = [0, 2000, 4000];
+  for (const delayMs of delays) {
+    if (delayMs > 0) await new Promise((r) => setTimeout(r, delayMs));
+    try {
+      receipt = await client.getTransactionReceipt({ hash: txHash });
+      break;
+    } catch {
+      if (delayMs === delays[delays.length - 1]) {
+        return { ok: false, reason: "TX_NOT_FOUND" };
+      }
+    }
+  }
+
+  if (!receipt) {
     return { ok: false, reason: "TX_NOT_FOUND" };
   }
 
   if (receipt.status !== "success") {
     return { ok: false, reason: "TX_FAILED" };
-  }
-
-  if (receipt.to?.toLowerCase() !== contractAddress.toLowerCase()) {
-    return { ok: false, reason: "INVALID_PAYMENT" };
   }
 
   const user = fromWallet.toLowerCase();
