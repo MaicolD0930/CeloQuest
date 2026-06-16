@@ -22,8 +22,8 @@ import { BottomNav } from "@/components/BottomNav";
 import { ChallengeCompletedCard } from "@/components/ChallengeCompletedCard";
 import { CategoryBadge } from "@/components/CategoryBadge";
 import { ChallengeSkeleton } from "@/components/skeletons/PageSkeletons";
-import { formatDurationMs, formatTimerLive } from "@/lib/format";
-import { getAttemptElapsedMs, capAttemptDurationMs, repairInflatedDurationMs } from "@/lib/challenge-timer";
+import { formatDurationMs } from "@/lib/format";
+import { repairInflatedDurationMs, capAttemptDurationMs } from "@/lib/challenge-timer";
 import { invalidateMeCache } from "@/lib/client/me-cache";
 import {
   fetchChallengeToday,
@@ -265,28 +265,6 @@ export default function ChallengePage() {
     !summary &&
     !awaitingRefill &&
     !introDismissed;
-
-  const isTimerFrozen = !!summary || awaitingRefill || !!feedback;
-
-  const timerActive =
-    !loading &&
-    !showIntro &&
-    !summary &&
-    !alreadyDone &&
-    questions.length > 0 &&
-    !!question &&
-    !isTimerFrozen;
-
-  const elapsedMs = useChallengeElapsed(
-    startedAt,
-    durationOffset,
-    awaitingRefill ? "awaiting_refill" : "in_progress",
-    isTimerFrozen,
-    timerActive
-  );
-
-  const displayElapsedMs =
-    summary?.durationMs != null ? summary.durationMs : elapsedMs;
 
   async function handleStartChallenge() {
     setIntroDismissed(true);
@@ -627,7 +605,7 @@ export default function ChallengePage() {
             body={t.challenge.dailyAttemptEndedBody}
             livesLabel={`0 ${t.challenge.livesAvailable}`}
             earnedLabel={`+${xpEarned} XP ${t.challenge.earnedSoFar}`}
-            elapsedMs={displayElapsedMs}
+            elapsedMs={capAttemptDurationMs(durationOffset)}
             timerPaused
             timeLabel={t.challenge.elapsedTime}
             recoverLabel={t.challenge.recoverEnergy}
@@ -746,23 +724,6 @@ export default function ChallengePage() {
               <div className="absolute inset-y-0 left-0 w-1/2 animate-shimmer bg-white/25" />
             </div>
           </div>
-          {startedAt && (
-            <div
-              className={`flex shrink-0 items-center gap-1 rounded-xl bg-surface px-2.5 py-1.5 ring-1 ${
-                isTimerFrozen ? "ring-h-border opacity-80" : "ring-prosperity/30"
-              }`}
-            >
-              <Clock className={`size-3.5 ${isTimerFrozen ? "text-h-muted" : "text-prosperity"}`} />
-              <span
-                className={`font-mono text-xs font-bold tabular-nums ${
-                  isTimerFrozen ? "text-h-muted" : "text-prosperity"
-                }`}
-              >
-                {isTimerFrozen ? "⏸ " : ""}
-                {formatTimerLive(displayElapsedMs)}
-              </span>
-            </div>
-          )}
           <span
             className={`flex shrink-0 items-center gap-0.5 font-display text-sm font-bold ${
               livesLeft > 0 ? "text-danger" : "text-h-muted"
@@ -870,16 +831,6 @@ export default function ChallengePage() {
                 </>
               )}
             </p>
-            {startedAt && (
-              <p className="mt-1 flex items-center gap-1.5 px-3 text-xs font-semibold text-h-muted">
-                <Clock className="size-3.5 text-prosperity" />
-                {isTimerFrozen ? "⏸ " : ""}
-                {t.challenge.elapsedTime}:{" "}
-                <span className="font-mono text-prosperity">
-                  {formatDurationMs(displayElapsedMs)}
-                </span>
-              </p>
-            )}
             {!feedback.correct && (
               <p className="mt-2 px-3 text-sm font-semibold text-h-foreground">
                 {t.challenge.correctAnswerWas}{" "}
@@ -1337,32 +1288,4 @@ function StatCard({
       </span>
     </div>
   );
-}
-
-function useChallengeElapsed(
-  startedAt: string | null,
-  durationOffset: number,
-  result: string,
-  paused: boolean,
-  active: boolean
-) {
-  const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    if (!active || paused || !startedAt) return;
-    setNow(Date.now());
-    const id = setInterval(() => setNow(Date.now()), 250);
-    return () => clearInterval(id);
-  }, [startedAt, durationOffset, paused, active]);
-
-  if (!startedAt || paused || !active) {
-    return capAttemptDurationMs(durationOffset);
-  }
-
-  return getAttemptElapsedMs({
-    startedAt,
-    durationMs: durationOffset,
-    result,
-    now,
-  });
 }
