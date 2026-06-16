@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import type { DailyAttempt, User } from "@prisma/client";
-import { LIVES_PER_DAY, todayKey, type AnswerRecord } from "@/lib/game";
+import { LIVES_PER_DAY, type AnswerRecord } from "@/lib/game";
 import { allowDailyChallengeRetry, DEMO_QUESTION_SETS_PER_CYCLE } from "@/lib/dev-flags";
 import { buildDailyQuestionIds } from "@/lib/questions/daily";
 import { finalizeDailyAttempt } from "@/lib/attempts";

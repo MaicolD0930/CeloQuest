@@ -8,7 +8,7 @@ import {
   getMasteredCategories,
   countCompletedChallenges,
 } from "@/lib/questions/progress";
-import { getAchievementDef, resolveAchievementDisplay } from "@/lib/achievements/catalog";
+import { resolveAchievementDisplay } from "@/lib/achievements/catalog";
 import type { Locale } from "@/lib/i18n/dictionaries";
 
 export async function GET(req: Request) {
@@ -65,7 +65,6 @@ export async function GET(req: Request) {
           description: a.description,
           emoji: a.emoji,
         });
-        const def = getAchievementDef(a.type);
         return {
           id: a.id,
           type: a.type,
@@ -74,11 +73,6 @@ export async function GET(req: Request) {
           emoji: display.emoji,
           image: display.image,
           status: a.status,
-          claimable:
-            a.status === "pending" &&
-            display.claimMode === "manual" &&
-            def?.tokenId != null,
-          nftTokenId: a.nftTokenId,
           createdAt: a.createdAt,
         };
       }),

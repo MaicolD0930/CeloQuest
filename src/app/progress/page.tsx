@@ -56,7 +56,6 @@ type ProgressResponse = {
     title: string;
     description: string;
     emoji: string;
-    claimable: boolean;
     createdAt: string;
   }[];
 };
@@ -285,14 +284,6 @@ export default function ProgressPage() {
                     <p className="font-semibold">{display.title}</p>
                     <p className="text-xs text-h-muted">{display.description}</p>
                   </div>
-                  {a.claimable && (
-                    <Link
-                      href="/achievements"
-                      className="shrink-0 rounded-full bg-lemon/20 px-2 py-0.5 text-[10px] font-bold uppercase text-lemon"
-                    >
-                      {t.progress.claimNft}
-                    </Link>
-                  )}
                 </div>
                 );
               })}

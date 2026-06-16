@@ -63,14 +63,15 @@ Copia desde tu `.env` local (mismos valores que ya usas):
 - `USDC_ADDRESS` / `NEXT_PUBLIC_USDC_ADDRESS`
 - `RECOVERY_CONTRACT_ADDRESS` / `NEXT_PUBLIC_RECOVERY_CONTRACT_ADDRESS`
 - `REWARDS_CONTRACT_ADDRESS` / `NEXT_PUBLIC_REWARDS_CONTRACT_ADDRESS`
-- `ACHIEVEMENTS_CONTRACT_ADDRESS` / `NEXT_PUBLIC_ACHIEVEMENTS_CONTRACT_ADDRESS`
+- `REWARDS_AUTOMATOR_ADDRESS` (opcional — wallet del cron)
+- `CRON_SECRET` — protege `/api/cron/seasons`
 - `RECOVERY_TREASURY_ADDRESS` / `NEXT_PUBLIC_RECOVERY_TREASURY`
 - `RECOVERY_PRICE_USD_CENTS=10`
 - `NEXT_PUBLIC_RECOVERY_PRICE_USD_CENTS=10`
 
 ### Servidor (secreto — solo Production)
 
-- `DEPLOYER_PRIVATE_KEY` — mint NFT, pagos admin, envío de tokens  
+- `DEPLOYER_PRIVATE_KEY` — pagos admin, recompensas USDC, envío de tokens  
   **Nunca** marques esta variable como expuesta al cliente.
 
 ### Producción — flags que deben quedar así
@@ -118,25 +119,12 @@ npm run db:seed
 # npm run db:seed:force
 ```
 
-### NFTs visibles en wallet
+### Fondear recompensas USDC
 
-1. En Vercel, confirma `NEXT_PUBLIC_APP_URL=https://tu-dominio.vercel.app`
-2. Regenera metadata con URLs públicas:
-
-```bash
-NEXT_PUBLIC_APP_URL=https://tu-dominio.vercel.app npm run nft:sync
-```
-
-3. Commit + push de `public/nft-assets/metadata/*.json` (o redeploy si Vercel construye desde repo actualizado)
-4. Actualiza el contrato on-chain:
-
-```bash
-NEXT_PUBLIC_APP_URL=https://tu-dominio.vercel.app npm run contracts:set:achievements-uri
-```
-
-> El signer debe ser el **owner** del contrato achievements (normalmente la wallet admin/tesorería). Si `DEPLOYER_PRIVATE_KEY` no es el owner, usa CeloScan → Write Contract → `setBaseURI`.
-
-5. Redeploy en Vercel si cambiaste archivos de metadata
+1. Despliega `CeloQuestRewards` con USDC: `npm run contracts:deploy:rewards`
+2. Transfiere USDC al contrato (o `deposit` como owner)
+3. Configura `CRON_SECRET` en Vercel — el cron en `vercel.json` llama `/api/cron/seasons` cada lunes
+4. El admin puede forzar pago manual desde el panel (usa `finalizeSeasonRewardForced`)
 
 ---
 
@@ -148,9 +136,8 @@ NEXT_PUBLIC_APP_URL=https://tu-dominio.vercel.app npm run contracts:set:achievem
 | DB Supabase + migraciones en build | ✅ |
 | Preguntas (seed manual) | ✅ tras `db:seed` |
 | Recuperación de vidas on-chain | ✅ si contratos en env |
-| Recompensas semanales admin | ✅ con `DEPLOYER_PRIVATE_KEY` |
-| NFT mint desde app | ✅ |
-| NFT con imagen en wallet | ✅ tras `nft:sync` + `setBaseURI` |
+| Recompensas semanales (3 USDC) | ✅ cron + admin force |
+| Logros personales (in-app) | ✅ |
 | Dominio custom | Opcional (Vercel → Domains) |
 
 ---

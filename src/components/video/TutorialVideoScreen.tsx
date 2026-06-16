@@ -13,6 +13,7 @@ type Labels = {
   videoReadyTitle: string;
   createWallet: string;
   alreadyHaveWallet: string;
+  startNow?: string;
   close: string;
   player: {
     play: string;
@@ -30,6 +31,8 @@ type Props = {
   onClose: () => void;
   onCreateWallet: () => void;
   onAlreadyHaveWallet: () => void;
+  /** Hide wallet-creation CTA (MiniPay in-app browser). */
+  miniPayMode?: boolean;
 };
 
 export function TutorialVideoScreen({
@@ -38,6 +41,7 @@ export function TutorialVideoScreen({
   onClose,
   onCreateWallet,
   onAlreadyHaveWallet,
+  miniPayMode = false,
 }: Props) {
   const video = getTutorialVideo(videoId);
   const [finished, setFinished] = useState(false);
@@ -86,21 +90,34 @@ export function TutorialVideoScreen({
               </h2>
 
               <div className="mt-8 flex w-full flex-col gap-3">
-                <button
-                  type="button"
-                  onClick={onCreateWallet}
-                  className="btn-chunky flex w-full items-center justify-center gap-2 rounded-2xl bg-lemon py-4 font-display text-lg font-bold text-h-background"
-                >
-                  👛 {labels.createWallet}
-                </button>
-                <button
-                  type="button"
-                  onClick={onAlreadyHaveWallet}
-                  className="btn-chunky flex w-full items-center justify-center gap-2 rounded-2xl bg-prosperity py-4 font-display text-lg font-bold text-h-background"
-                >
-                  {labels.alreadyHaveWallet}
-                  <ArrowRight className="size-5" />
-                </button>
+                {miniPayMode ? (
+                  <button
+                    type="button"
+                    onClick={onAlreadyHaveWallet}
+                    className="btn-chunky flex w-full items-center justify-center gap-2 rounded-2xl bg-prosperity py-4 font-display text-lg font-bold text-h-background"
+                  >
+                    📱 {labels.startNow ?? labels.alreadyHaveWallet}
+                    <ArrowRight className="size-5" />
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={onCreateWallet}
+                      className="btn-chunky flex w-full items-center justify-center gap-2 rounded-2xl bg-lemon py-4 font-display text-lg font-bold text-h-background"
+                    >
+                      👛 {labels.createWallet}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onAlreadyHaveWallet}
+                      className="btn-chunky flex w-full items-center justify-center gap-2 rounded-2xl bg-prosperity py-4 font-display text-lg font-bold text-h-background"
+                    >
+                      {labels.alreadyHaveWallet}
+                      <ArrowRight className="size-5" />
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           </div>

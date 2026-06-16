@@ -8,13 +8,14 @@ const es = {
     firstStepHint: "Nunca he usado blockchain",
     startNow: "Comenzar ahora",
     startNowHint: "Ya tengo una wallet",
+    minipayStartHint: "Tu wallet MiniPay se conectará sola",
     chooseWallet: "Ya tengo wallet — elige cómo conectar",
     connectWith: "Conectar",
     poweredBy: "Construido sobre Celo",
     stats: [
       { value: "150+", label: "Preguntas" },
       { value: "5", label: "Retos / día" },
-      { value: "25k", label: "tCOPM / semana" },
+      { value: "3", label: "USDC / semana" },
     ],
   },
   onboarding: {
@@ -96,6 +97,9 @@ const es = {
     noWallet:
       "No detectamos una wallet. Instala MiniPay, MetaMask o Rabby, o abre CeloQuest dentro de MiniPay.",
     minipayDetected: "¡MiniPay detectado!",
+    minipayConnecting: "Conectando tu wallet MiniPay…",
+    minipaySubtitle: "Entra con la wallet que ya tienes en MiniPay",
+    minipayRetry: "Reintentar conexión",
     errorGeneric: "Algo salió mal. Intenta de nuevo.",
     usernameRequired: "Escribe un nombre de al menos 3 caracteres",
     continueToApp: "Entrar a CeloQuest",
@@ -137,12 +141,12 @@ const es = {
       {
         question: "¿Cómo reclamo una medalla?",
         answer:
-          'Cuando desbloqueas uno, aparece listo en "Mis logros". Entra, pulsa reclamar y llévatelo a tu wallet como medalla NFT.',
+          'Cuando desbloqueas un logro, aparece al instante en "Mis logros" con su imagen personal. No necesitas pagar comisión de red ni mintear nada en blockchain.',
       },
       {
         question: "¿Cómo funciona el ranking semanal?",
         answer:
-          "Cada semana es una nueva carrera. Suma XP, escala en el leaderboard y compite por recompensas exclusivas: los mejores de la temporada se llevan premios especiales.",
+          "Cada semana es una nueva carrera. Suma XP, escala en el leaderboard y compite por 3 USDC para el campeón semanal.",
       },
       {
         question: "¿Qué pasa si pierdo mi vida diaria?",
@@ -157,12 +161,12 @@ const es = {
       {
         question: "¿Qué recompensas puedo recibir?",
         answer:
-          "Insignias en la app, medallas NFT on-chain, premios semanales en tokens y reconocimiento ante la comunidad. Juega, aprende y convierte tu progreso en recompensas reales.",
+          "Medallas personales en la app, premio semanal de 3 USDC al campeón y reconocimiento ante la comunidad. Juega, aprende y convierte tu progreso en recompensas reales.",
       },
       {
         question: "¿Dónde veo mis logros?",
         answer:
-          'Todo en un solo lugar: entra a "Mis logros" para ver lo que ya ganaste, lo pendiente por reclamar y cuánto te falta para el siguiente hito.',
+          'Todo en un solo lugar: entra a "Mis logros" para ver tus medallas, tu historial semanal y tu actividad diaria.',
       },
     ],
   },
@@ -247,10 +251,8 @@ const es = {
     futureHint:
       "Funcionalidades planeadas — lo demás ya está disponible en este panel.",
     futureItems: [
-      "Mint on-chain de NFTs para logros",
       "Autenticación SIWE (firma de wallet)",
       "Editor de preguntas en el panel",
-      "Cierre automático de temporadas (cron)",
       "Despliegue en Celo Mainnet (cCOPM)",
     ],
   },
@@ -297,7 +299,6 @@ const es = {
     mastered: "Dominada",
     achievementsTitle: "Logros obtenidos",
     achievementsEmpty: "Completa retos y mantén tu racha para desbloquear logros.",
-    claimNft: "Reclamar",
     tipTitle: "Aprende jugando",
     tipBody:
       "Las preguntas se adaptan a tu nivel. A más XP, más retos técnicos sobre Celo y Web3.",
@@ -400,35 +401,19 @@ const es = {
     season: "Semana del",
     pendingRewards: "Recompensas pendientes",
     tokenReward: "Recompensa en tokens",
-    nftReward: "NFT de logro",
+    nftReward: "Medalla de logro",
     status: "Estado",
-    onchainSoon: "Mint onchain próximamente",
+    onchainSoon: "",
     totalWeeks: "Semanas totales",
-    earned: "Medallas",
+    earned: "Logros",
   },
   achievements: {
     tab: "Logros",
     title: "Mis logros",
-    subtitle: "NFTs de logros vinculados a tu wallet",
-    newUnlocked: "¡Nuevo logro desbloqueado!",
-    newUnlockedBody: "Reclama tu NFT on-chain cuando quieras.",
-    nftHelpAria: "¿Qué es un NFT?",
-    nftHelpBody:
-      "Los NFTs en CeloQuest funcionan como medallas de aprendizaje. Cada vez que avanzas, completas retos o ganas una competencia, puedes obtener un reconocimiento digital que representa tu progreso.",
-    available: "Disponibles para reclamar",
-    noAvailable: "No tienes logros pendientes. Sigue jugando para desbloquear más.",
-    claimed: "NFTs reclamados",
-    noClaimed: "Aún no has reclamado ningún NFT.",
-    badges: "Insignias en app",
-    failed: "Reclamos fallidos",
-    claim: "Reclamar NFT",
-    claiming: "Reclamando...",
-    retryClaim: "Reintentar",
-    statusAvailable: "Disponible",
-    statusClaimed: "Recibido",
-    statusBadge: "Insignia",
-    statusFailed: "Error de mint",
-    viewHistory: "Ver historial y medallas",
+    subtitle: "Medallas personales de tu progreso en CeloQuest",
+    tabBadges: "Logros",
+    tabHistory: "Historial",
+    statusEarned: "Desbloqueado",
     modalClose: "Cerrar",
     modalDragHint: "Arrastra para rotar en 3D",
   },
@@ -438,6 +423,12 @@ const es = {
     error: "Algo salió mal",
     retry: "Reintentar",
     language: "Idioma",
+  },
+  weeklyPrize: {
+    badge: "Premio semanal",
+    title: "{amount} USDC",
+    hint: "El jugador #1 del ranking semanal recibe {amount} USDC directo en su wallet al cerrar la temporada.",
+    onChain: "Pago on-chain automático",
   },
   levels: {
     1: "Explorador Web3",
@@ -455,13 +446,14 @@ const en: Dict = {
     firstStepHint: "I've never used blockchain",
     startNow: "Start now",
     startNowHint: "I already have a wallet",
+    minipayStartHint: "Your MiniPay wallet connects automatically",
     chooseWallet: "I have a wallet — choose how to connect",
     connectWith: "Connect",
     poweredBy: "Built on Celo",
     stats: [
       { value: "150+", label: "Questions" },
       { value: "5", label: "Daily quests" },
-      { value: "25k", label: "tCOPM / week" },
+      { value: "3", label: "USDC / week" },
     ],
   },
   onboarding: {
@@ -543,6 +535,9 @@ const en: Dict = {
     noWallet:
       "No wallet detected. Install MiniPay, MetaMask, or Rabby, or open CeloQuest inside MiniPay.",
     minipayDetected: "MiniPay detected!",
+    minipayConnecting: "Connecting your MiniPay wallet…",
+    minipaySubtitle: "Sign in with the wallet you already have in MiniPay",
+    minipayRetry: "Retry connection",
     errorGeneric: "Something went wrong. Try again.",
     usernameRequired: "Enter a name with at least 3 characters",
     continueToApp: "Enter CeloQuest",
@@ -584,12 +579,12 @@ const en: Dict = {
       {
         question: "How do I claim a medal?",
         answer:
-          'Once unlocked, it shows up as available in "My achievements". Tap claim and take it to your wallet as an NFT medal.',
+          'When you unlock an achievement, it appears instantly in "My achievements" with its personal badge image. No network fees or blockchain minting required.',
       },
       {
         question: "How does the weekly ranking work?",
         answer:
-          "Every week is a fresh race. Earn XP, climb the leaderboard, and compete for exclusive rewards—top players of the season take home special prizes.",
+          "Every week is a fresh race. Earn XP, climb the leaderboard, and compete for 3 USDC awarded to the weekly champion.",
       },
       {
         question: "What happens if I lose my daily life?",
@@ -604,7 +599,7 @@ const en: Dict = {
       {
         question: "What rewards can I receive?",
         answer:
-          "In-app badges, on-chain NFT medals, weekly token prizes, and recognition from the community. Play, learn, and turn your progress into real rewards.",
+          "Personal in-app badges, a weekly 3 USDC prize for the champion, and community recognition. Play, learn, and turn your progress into real rewards.",
       },
       {
         question: "Where can I see my achievements?",
@@ -694,10 +689,8 @@ const en: Dict = {
     futureHint:
       "Planned features — everything else is already available in this panel.",
     futureItems: [
-      "On-chain NFT mint for achievements",
       "SIWE wallet authentication",
       "Question editor in admin panel",
-      "Scheduled season finalization (cron)",
       "Celo Mainnet deployment (cCOPM)",
     ],
   },
@@ -744,7 +737,6 @@ const en: Dict = {
     mastered: "Mastered",
     achievementsTitle: "Achievements",
     achievementsEmpty: "Complete challenges and keep your streak to unlock achievements.",
-    claimNft: "Claim",
     tipTitle: "Learn by playing",
     tipBody:
       "Questions adapt to your level. The more XP you earn, the more technical Celo and Web3 challenges you'll get.",
@@ -838,7 +830,7 @@ const en: Dict = {
     title: "My Medals",
     subtitle: "Achievements and rewards linked to your wallet",
     achievements: "Achievements",
-    noAchievements: "No medals yet. Compete in the weekly season.",
+    noAchievements: "No achievements yet. Compete in the weekly season.",
     competitionHistory: "Competition history",
     noHistory: "Your history will appear here after a season ends.",
     dailyHistory: "Daily history",
@@ -847,35 +839,19 @@ const en: Dict = {
     season: "Week of",
     pendingRewards: "Pending rewards",
     tokenReward: "Token reward",
-    nftReward: "Achievement NFT",
+    nftReward: "Achievement badge",
     status: "Status",
-    onchainSoon: "Onchain mint coming soon",
+    onchainSoon: "",
     totalWeeks: "Total weeks",
-    earned: "Medals",
+    earned: "Achievements",
   },
   achievements: {
     tab: "Achievements",
     title: "My achievements",
-    subtitle: "Achievement NFTs linked to your wallet",
-    newUnlocked: "New achievement unlocked!",
-    newUnlockedBody: "Claim your on-chain NFT whenever you're ready.",
-    nftHelpAria: "What is an NFT?",
-    nftHelpBody:
-      "NFTs in CeloQuest work as learning medals. Each time you progress, complete challenges, or win a competition, you can earn a digital recognition that represents your progress.",
-    available: "Available to claim",
-    noAvailable: "No pending achievements. Keep playing to unlock more.",
-    claimed: "Claimed NFTs",
-    noClaimed: "You haven't claimed any NFTs yet.",
-    badges: "In-app badges",
-    failed: "Failed claims",
-    claim: "Claim NFT",
-    claiming: "Claiming...",
-    retryClaim: "Retry",
-    statusAvailable: "Available",
-    statusClaimed: "Received",
-    statusBadge: "Badge",
-    statusFailed: "Mint failed",
-    viewHistory: "View history and medals",
+    subtitle: "Personal progress badges in CeloQuest",
+    tabBadges: "Achievements",
+    tabHistory: "History",
+    statusEarned: "Unlocked",
     modalClose: "Close",
     modalDragHint: "Drag to rotate in 3D",
   },
@@ -885,6 +861,12 @@ const en: Dict = {
     error: "Something went wrong",
     retry: "Retry",
     language: "Language",
+  },
+  weeklyPrize: {
+    badge: "Weekly prize",
+    title: "{amount} USDC",
+    hint: "The #1 player on the weekly leaderboard receives {amount} USDC straight to their wallet when the season closes.",
+    onChain: "Automatic on-chain payout",
   },
   levels: {
     1: "Explorador Web3",

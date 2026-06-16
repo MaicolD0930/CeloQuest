@@ -87,7 +87,7 @@ Con revive a **$0.05**, **$1 USDC ≈ 20 pruebas** por persona.
 | Token COP | `TCOPM_ADDRESS` | `CCOPM_ADDRESS` |
 | USDC | Sepolia testnet | USDC mainnet |
 | `CeloQuestRewards.sol` | `REWARD_AMOUNT = 25_000` fijo | Cambiar a **1.000** (o hacer configurable por env y redeploy) |
-| `rewards-abi.ts` | `WEEKLY_REWARD_TCOPM = "25000"` | `"1000"` (debe coincoincidir con contrato) |
+| `rewards-abi.ts` | `WEEKLY_REWARD_USDC = "3"` | debe coincidir con contrato |
 | `dictionaries.ts` landing | `"25k tCOPM / semana"` | `"1.000 COPM / semana"` |
 | `hardhat.config.ts` | Solo `celoSepolia` | Añadir red `celo` mainnet |
 | Scripts deploy | `network: celoSepolia` | Variante mainnet + `CCOPM_ADDRESS` |

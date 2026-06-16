@@ -8,10 +8,12 @@ import { useLocale } from "@/lib/i18n/LocaleProvider";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { DraggableOctopus } from "@/components/landing/DraggableOctopus";
 import { LandingBackground } from "@/components/landing/LandingBackground";
+import { useIsMiniPay } from "@/hooks/useIsMiniPay";
 
 export default function LandingPage() {
   const { t } = useLocale();
   const router = useRouter();
+  const miniPay = useIsMiniPay();
 
   useEffect(() => {
     fetch("/api/users/me", { credentials: "include" })
@@ -74,30 +76,42 @@ export default function LandingPage() {
           className="animate-card-pop mt-10 flex w-full flex-col gap-3.5"
           style={{ animationDelay: "360ms" }}
         >
-          <LandingCTA
-            href="/onboarding"
-            variant="primary"
-            icon="🚀"
-            title={t.landing.firstStep}
-            subtitle={t.landing.firstStepHint}
-          />
-          <p className="text-center text-xs font-bold uppercase tracking-wide text-h-muted">
-            {t.landing.chooseWallet}
-          </p>
-          <div className="grid grid-cols-2 gap-3">
-            <LandingWalletCTA
-              href="/connect?wallet=metamask"
-              icon="🦊"
-              name="MetaMask"
-              actionLabel={t.landing.connectWith}
+          {miniPay ? (
+            <LandingCTA
+              href="/connect"
+              variant="primary"
+              icon="📱"
+              title={t.landing.startNow}
+              subtitle={t.landing.minipayStartHint}
             />
-            <LandingWalletCTA
-              href="/connect?wallet=rabby"
-              icon="🐰"
-              name="Rabby"
-              actionLabel={t.landing.connectWith}
-            />
-          </div>
+          ) : (
+            <>
+              <LandingCTA
+                href="/onboarding"
+                variant="primary"
+                icon="🚀"
+                title={t.landing.firstStep}
+                subtitle={t.landing.firstStepHint}
+              />
+              <p className="text-center text-xs font-bold uppercase tracking-wide text-h-muted">
+                {t.landing.chooseWallet}
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <LandingWalletCTA
+                  href="/connect?wallet=metamask"
+                  icon="🦊"
+                  name="MetaMask"
+                  actionLabel={t.landing.connectWith}
+                />
+                <LandingWalletCTA
+                  href="/connect?wallet=rabby"
+                  icon="🐰"
+                  name="Rabby"
+                  actionLabel={t.landing.connectWith}
+                />
+              </div>
+            </>
+          )}
         </div>
 
         <p

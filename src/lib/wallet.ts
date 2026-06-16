@@ -5,6 +5,7 @@ import {
   encodeFunctionData,
   http,
   type Hash,
+  type Chain,
 } from "viem";
 import { getActiveChain, getRpcUrl } from "@/lib/chain/config";
 import { erc20ExtendedAbi } from "@/lib/contracts/recovery-payment-abi";
@@ -49,9 +50,51 @@ export function isMiniPay(): boolean {
   return discoverWalletProviders().some((w) => w.id === "minipay" && w.installed);
 }
 
+/** MiniPay requires legacy txs (no maxFeePerGas / maxPriorityFeePerGas). */
+function shouldUseLegacyTransactions(providerId?: WalletProviderId): boolean {
+  return providerId === "minipay" || isMiniPay();
+}
+
+async function sendWalletTransaction(
+  walletClient: ReturnType<typeof createWalletClient>,
+  publicClient: ReturnType<typeof createPublicClient>,
+  params: {
+    account: `0x${string}`;
+    to: `0x${string}`;
+    data: `0x${string}`;
+    chain: Chain;
+  },
+  providerId?: WalletProviderId
+): Promise<Hash> {
+  if (shouldUseLegacyTransactions(providerId)) {
+    const gasPrice = await publicClient.getGasPrice();
+    return walletClient.sendTransaction({
+      chain: params.chain,
+      account: params.account,
+      to: params.to,
+      data: params.data,
+      type: "legacy",
+      gasPrice,
+    });
+  }
+
+  return walletClient.sendTransaction({
+    chain: params.chain,
+    account: params.account,
+    to: params.to,
+    data: params.data,
+  });
+}
+
 export async function connectWallet(providerId?: WalletProviderId): Promise<string> {
   const provider = resolveWalletProvider(providerId);
-  await ensureCorrectChain(provider);
+  const miniPayConnect = providerId === "minipay" || isMiniPay();
+  try {
+    await ensureCorrectChain(provider);
+  } catch (err) {
+    // MiniPay login uses wallet address only; chain switch may fail on mainnet.
+    if (!miniPayConnect) throw err;
+  }
   const client = createWalletClient({
     chain: getActiveChain(),
     transport: custom(provider),
@@ -82,7 +125,8 @@ async function ensureTokenAllowance(
   account: `0x${string}`,
   tokenAddress: `0x${string}`,
   spender: `0x${string}`,
-  required: bigint
+  required: bigint,
+  providerId?: WalletProviderId
 ): Promise<void> {
   const publicClient = createPublicClient({
     chain: getActiveChain(),
@@ -114,12 +158,17 @@ async function ensureTokenAllowance(
 
   const chain = getActiveChain();
 
-  const approveHash = await walletClient.sendTransaction({
-    chain,
-    account,
-    to: tokenAddress,
-    data: approveData,
-  });
+  const approveHash = await sendWalletTransaction(
+    walletClient,
+    publicClient,
+    {
+      chain,
+      account,
+      to: tokenAddress,
+      data: approveData,
+    },
+    providerId
+  );
 
   await publicClient.waitForTransactionReceipt({ hash: approveHash });
 }
@@ -163,21 +212,28 @@ export async function sendRecoveryPayment(
     account,
     prepared.tokenAddress,
     prepared.contractAddress,
-    required
+    required,
+    providerId
   );
 
   const data = encodePurchaseRecovery(prepared.tokenAddress);
-  const hash = await walletClient.sendTransaction({
-    chain: getActiveChain(),
-    account,
-    to: prepared.contractAddress,
-    data,
-  });
-
+  const chain = getActiveChain();
   const publicClient = createPublicClient({
-    chain: getActiveChain(),
+    chain,
     transport: http(getRpcUrl()),
   });
+  const hash = await sendWalletTransaction(
+    walletClient,
+    publicClient,
+    {
+      chain,
+      account,
+      to: prepared.contractAddress,
+      data,
+    },
+    providerId
+  );
+
   await publicClient.waitForTransactionReceipt({ hash });
 
   return { hash, token: prepared.token };

@@ -7,11 +7,13 @@ import { ArrowLeft, ArrowRight, ChevronRight, ExternalLink } from "lucide-react"
 import { useLocale } from "@/lib/i18n/LocaleProvider";
 import { TutorialVideoScreen } from "@/components/video/TutorialVideoScreen";
 import type { TutorialVideoId } from "@/lib/videos/catalog";
+import { useIsMiniPay } from "@/hooks/useIsMiniPay";
 
 function OnboardingContent() {
   const { t } = useLocale();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const miniPay = useIsMiniPay();
   const [step, setStep] = useState(0);
   const [activeVideo, setActiveVideo] = useState<TutorialVideoId | null>(null);
 
@@ -19,13 +21,39 @@ function OnboardingContent() {
   const onResources = step >= slides.length;
   const slide = onResources ? null : slides[step];
   const isLastSlide = step === slides.length - 1;
-  const totalSteps = slides.length + 1;
+  const totalSteps = miniPay ? slides.length : slides.length + 1;
 
   useEffect(() => {
-    if (searchParams.get("resources") === "1") {
+    if (miniPay && searchParams.get("resources") === "1") {
+      router.replace("/connect?from=onboarding");
+      return;
+    }
+    if (!miniPay && searchParams.get("resources") === "1") {
       setStep(slides.length);
     }
-  }, [searchParams, slides.length]);
+  }, [searchParams, slides.length, miniPay, router]);
+
+  useEffect(() => {
+    if (miniPay && step >= slides.length) {
+      router.replace("/connect?from=onboarding");
+    }
+  }, [miniPay, step, slides.length, router]);
+
+  if (miniPay && step >= slides.length) {
+    return null;
+  }
+
+  function handleNextSlide() {
+    if (isLastSlide) {
+      if (miniPay) {
+        router.push("/connect?from=onboarding");
+      } else {
+        setStep(slides.length);
+      }
+      return;
+    }
+    setStep(step + 1);
+  }
 
   return (
     <>
@@ -49,7 +77,7 @@ function OnboardingContent() {
           </Link>
         </div>
 
-        {onResources ? (
+        {onResources && !miniPay ? (
           <div className="animate-card-pop flex flex-1 flex-col">
             <h2 className="font-display text-3xl font-bold text-h-foreground">
               {t.onboarding.resourcesTitle}
@@ -123,12 +151,14 @@ function OnboardingContent() {
               )}
               <button
                 type="button"
-                onClick={() =>
-                  isLastSlide ? setStep(slides.length) : setStep(step + 1)
-                }
+                onClick={handleNextSlide}
                 className="btn-chunky flex w-full items-center justify-center gap-2 rounded-2xl bg-lemon py-4 font-display text-lg font-bold text-h-background"
               >
-                {isLastSlide ? t.onboarding.seeResources : t.onboarding.next}
+                {isLastSlide
+                  ? miniPay
+                    ? t.landing.startNow
+                    : t.onboarding.seeResources
+                  : t.onboarding.next}
                 <ArrowRight className="size-5" />
               </button>
             </div>
@@ -144,9 +174,11 @@ function OnboardingContent() {
             videoReadyTitle: t.onboarding.videoReadyTitle,
             createWallet: t.onboarding.createWallet,
             alreadyHaveWallet: t.onboarding.alreadyHaveWallet,
+            startNow: t.landing.startNow,
             close: t.onboarding.closeVideo,
             player: t.videoPlayer,
           }}
+          miniPayMode={miniPay}
           onClose={() => setActiveVideo(null)}
           onCreateWallet={() => setActiveVideo(null)}
           onAlreadyHaveWallet={() => router.push("/connect?from=onboarding")}

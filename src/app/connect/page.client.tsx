@@ -1,18 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
   ArrowRight,
   CheckCircle2,
+  Loader2,
   ShieldCheck,
   Wallet,
 } from "lucide-react";
 import { useLocale } from "@/lib/i18n/LocaleProvider";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { WalletPicker } from "@/components/WalletPicker";
-import { connectWallet, hasInjectedWallet, isMiniPay } from "@/lib/wallet";
+import { connectWallet, hasInjectedWallet } from "@/lib/wallet";
 import {
   getPreferredWalletProvider,
   getWalletProvider,
@@ -20,6 +21,7 @@ import {
   type WalletProviderId,
 } from "@/lib/wallet-providers";
 import { USERNAME_MAX } from "@/lib/username";
+import { useIsMiniPay } from "@/hooks/useIsMiniPay";
 
 const AVATARS = ["🦊", "🐸", "🦁", "🐼", "🦄", "🐙", "🦉", "🐢"];
 const FETCH_OPTS: RequestInit = { credentials: "include" };
@@ -36,7 +38,8 @@ export default function ConnectPage() {
 
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [walletAvailable, setWalletAvailable] = useState(false);
-  const [miniPay, setMiniPay] = useState(false);
+  const miniPay = useIsMiniPay();
+  const autoConnectStarted = useRef(false);
   const [connecting, setConnecting] = useState(false);
   const [username, setUsername] = useState("");
   const [avatar, setAvatar] = useState(AVATARS[0]);
@@ -47,9 +50,11 @@ export default function ConnectPage() {
 
   useEffect(() => {
     setWalletAvailable(hasInjectedWallet());
-    setMiniPay(isMiniPay());
     const preferred = getPreferredWalletProvider();
-    if (
+    if (miniPay) {
+      setSelectedWallet("minipay");
+      savePreferredWalletProvider("minipay");
+    } else if (
       walletParam === "metamask" ||
       walletParam === "rabby" ||
       walletParam === "minipay"
@@ -64,7 +69,7 @@ export default function ConnectPage() {
         if (r.ok) goHome();
       })
       .catch(() => null);
-  }, [walletParam]);
+  }, [walletParam, miniPay]);
 
   function usernameErrorMessage(code: string): string {
     switch (code) {
@@ -142,20 +147,22 @@ export default function ConnectPage() {
     setError(null);
   }
 
-  async function handleConnect() {
+  async function handleConnect(walletId?: WalletProviderId) {
     setError(null);
-    if (!selectedWallet) {
+    const providerId = walletId ?? selectedWallet;
+    if (!providerId) {
       setError(t.connect.chooseWalletFirst);
       return;
     }
-    if (!getWalletProvider(selectedWallet)) {
+    if (!getWalletProvider(providerId)) {
       setError(t.connect.walletNotInstalled);
       return;
     }
     setConnecting(true);
     let connectedAddress: string | null = null;
     try {
-      const address = await connectWallet(selectedWallet);
+      savePreferredWalletProvider(providerId);
+      const address = await connectWallet(providerId);
       connectedAddress = address;
       setWalletAddress(address);
 
@@ -177,6 +184,13 @@ export default function ConnectPage() {
       setConnecting(false);
     }
   }
+
+  useEffect(() => {
+    if (!miniPay || walletAddress || autoConnectStarted.current) return;
+    autoConnectStarted.current = true;
+    void handleConnect("minipay");
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- auto-connect once when MiniPay is detected
+  }, [miniPay, walletAddress]);
 
   async function handleContinue() {
     if (!walletAddress) return;
@@ -229,6 +243,11 @@ export default function ConnectPage() {
   }
 
   const showProfileForm = needsProfile && walletAddress;
+  const connectSubtitle = miniPay
+    ? t.connect.minipaySubtitle
+    : fromOnboarding
+      ? t.connect.subtitleNew
+      : t.connect.subtitleExisting;
 
   return (
     <main className="home-perfil flex flex-1 flex-col px-4 pb-8 safe-top">
@@ -253,7 +272,7 @@ export default function ConnectPage() {
         className="animate-card-pop mb-6 text-sm font-semibold text-h-muted"
         style={{ animationDelay: "60ms" }}
       >
-        {fromOnboarding ? t.connect.subtitleNew : t.connect.subtitleExisting}
+        {connectSubtitle}
       </p>
 
       <section
@@ -288,17 +307,37 @@ export default function ConnectPage() {
               </button>
             )}
           </div>
+        ) : miniPay ? (
+          <div className="flex flex-col items-center gap-4 py-6">
+            <div className="grid size-16 place-items-center rounded-2xl bg-prosperity/15 text-3xl ring-1 ring-prosperity/30">
+              📱
+            </div>
+            <p className="text-center text-sm font-semibold text-h-muted">
+              {connecting ? t.connect.minipayConnecting : t.connect.minipayDetected}
+            </p>
+            {connecting && (
+              <Loader2 className="size-8 animate-spin text-prosperity" aria-hidden />
+            )}
+            {error && !connecting && (
+              <button
+                type="button"
+                onClick={() => {
+                  autoConnectStarted.current = false;
+                  void handleConnect("minipay");
+                }}
+                className="btn-chunky flex w-full items-center justify-center gap-2 rounded-2xl bg-lemon py-4 font-display text-base font-bold text-h-background"
+              >
+                {t.connect.minipayRetry}
+              </button>
+            )}
+          </div>
         ) : (
           <>
-            {miniPay && (
-              <p className="mb-3 text-center text-xs font-bold text-prosperity">
-                📱 {t.connect.minipayDetected}
-              </p>
-            )}
             <WalletPicker
               selected={selectedWallet}
               onSelect={handleSelectWallet}
               disabled={connecting}
+              hideMiniPay
               labels={{
                 chooseWallet: t.connect.chooseWallet,
                 notInstalled: t.connect.notInstalled,
@@ -307,7 +346,7 @@ export default function ConnectPage() {
             />
             <button
               type="button"
-              onClick={handleConnect}
+              onClick={() => void handleConnect()}
               disabled={connecting || !walletAvailable || !selectedWallet}
               className="btn-chunky mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-lemon py-4 font-display text-base font-bold text-h-background disabled:opacity-40"
             >
@@ -384,7 +423,7 @@ export default function ConnectPage() {
         </section>
       )}
 
-      {!showProfileForm && error && (
+      {!showProfileForm && error && !(miniPay && !walletAddress) && (
         <p className="animate-shake mt-4 rounded-xl bg-danger/10 px-4 py-2.5 text-center text-sm font-bold text-danger ring-1 ring-danger/25">
           {error}
         </p>

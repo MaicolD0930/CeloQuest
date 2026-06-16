@@ -7,7 +7,6 @@ import {
   LIVES_PER_DAY,
   QUESTIONS_PER_DAY,
   weekEnd,
-  weekKey,
   type AnswerRecord,
 } from "@/lib/game";
 import { getNextTierName } from "@/lib/questions/levels";

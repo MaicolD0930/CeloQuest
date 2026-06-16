@@ -3,6 +3,7 @@
 import { useParams, useRouter } from "next/navigation";
 import { TutorialVideoScreen } from "@/components/video/TutorialVideoScreen";
 import { useLocale } from "@/lib/i18n/LocaleProvider";
+import { useIsMiniPay } from "@/hooks/useIsMiniPay";
 import {
   getTutorialVideo,
   type TutorialVideoId,
@@ -11,6 +12,7 @@ import {
 export default function TutorialVideoPage() {
   const { t } = useLocale();
   const router = useRouter();
+  const miniPay = useIsMiniPay();
   const params = useParams();
   const videoId = String(params.videoId ?? "");
   const video = getTutorialVideo(videoId);
@@ -33,9 +35,11 @@ export default function TutorialVideoPage() {
         videoReadyTitle: t.onboarding.videoReadyTitle,
         createWallet: t.onboarding.createWallet,
         alreadyHaveWallet: t.onboarding.alreadyHaveWallet,
+        startNow: t.landing.startNow,
         close: t.onboarding.closeVideo,
         player: t.videoPlayer,
       }}
+      miniPayMode={miniPay}
       onClose={() => router.back()}
       onCreateWallet={() => router.push("/onboarding?resources=1")}
       onAlreadyHaveWallet={() => router.push("/connect?from=onboarding")}

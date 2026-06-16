@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, RefreshCw } from "lucide-react";
@@ -69,7 +69,7 @@ export default function AdminPage() {
     treasury: t.admin.treasury,
   };
 
-  async function loadStats(isRefresh = false) {
+  const loadStats = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
 
@@ -109,11 +109,11 @@ export default function AdminPage() {
       setLoading(false);
       setRefreshing(false);
     }
-  }
+  }, [router, t.admin.loadError]);
 
   useEffect(() => {
-    loadStats();
-  }, []);
+    void loadStats();
+  }, [loadStats]);
 
   if (loading) {
     return (

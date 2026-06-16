@@ -37,7 +37,7 @@ const RDNS: Record<WalletProviderId, string> = {
   minipay: "com.minipay",
 };
 
-let eip6963Providers: Partial<Record<WalletProviderId, EIP1193Provider>> = {};
+const eip6963Providers: Partial<Record<WalletProviderId, EIP1193Provider>> = {};
 let eip6963Initialized = false;
 
 function initEip6963Discovery() {

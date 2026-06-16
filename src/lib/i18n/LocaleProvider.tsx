@@ -30,11 +30,10 @@ function detectInitialLocale(): Locale {
 }
 
 export function LocaleProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>("es");
-
-  useEffect(() => {
-    setLocaleState(detectInitialLocale());
-  }, []);
+  const [locale, setLocaleState] = useState<Locale>(() => {
+    if (typeof window === "undefined") return "es";
+    return detectInitialLocale();
+  });
 
   useEffect(() => {
     document.documentElement.lang = locale;

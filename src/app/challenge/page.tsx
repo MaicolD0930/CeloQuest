@@ -31,6 +31,7 @@ import {
   type ChallengeTodayResponse,
 } from "@/lib/client/challenge-cache";
 import { WalletPicker } from "@/components/WalletPicker";
+import { useIsMiniPay } from "@/hooks/useIsMiniPay";
 import {
   sendRecoveryPayment,
   type RecoveryToken,
@@ -75,6 +76,7 @@ type Summary = {
 
 export default function ChallengePage() {
   const { t, locale } = useLocale();
+  const miniPay = useIsMiniPay();
 
   const [loading, setLoading] = useState(true);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -105,8 +107,13 @@ export default function ChallengePage() {
   const [copPerUsd, setCopPerUsd] = useState("");
 
   useEffect(() => {
+    if (miniPay) {
+      setSelectedWallet("minipay");
+      savePreferredWalletProvider("minipay");
+      return;
+    }
     setSelectedWallet(getPreferredWalletProvider());
-  }, []);
+  }, [miniPay]);
 
   useEffect(() => {
     if (!awaitingRefill) return;
@@ -425,11 +432,12 @@ export default function ChallengePage() {
 
   async function handleRefill() {
     setRefillError(null);
-    if (!selectedWallet) {
+    const walletId: WalletProviderId | null = miniPay ? "minipay" : selectedWallet;
+    if (!walletId) {
       setRefillError(t.connect.chooseWalletFirst);
       return;
     }
-    if (!getWalletProvider(selectedWallet)) {
+    if (!getWalletProvider(walletId)) {
       setRefillError(t.connect.walletNotInstalled);
       return;
     }
@@ -461,7 +469,7 @@ export default function ChallengePage() {
 
       const { hash: txHash, token: paidToken } = await sendRecoveryPayment(
         selectedToken,
-        selectedWallet,
+        walletId,
         payerWallet ?? undefined
       );
       const res = await fetch("/api/challenge/refill", {
@@ -635,6 +643,7 @@ export default function ChallengePage() {
               notInstalled: t.connect.notInstalled,
               install: t.connect.installWallet,
             }}
+            hideWalletPicker={miniPay}
           />
         </main>
         <BottomNav variant="perfil" />
@@ -1158,6 +1167,7 @@ function RefillScreen({
   selectedWallet,
   onSelectWallet,
   walletLabels,
+  hideWalletPicker = false,
 }: {
   title: string;
   body: string;
@@ -1187,6 +1197,7 @@ function RefillScreen({
   selectedWallet: WalletProviderId | null;
   onSelectWallet: (id: WalletProviderId) => void;
   walletLabels: { chooseWallet: string; notInstalled: string; install: string };
+  hideWalletPicker?: boolean;
 }) {
   return (
     <div className="flex flex-1 flex-col">
@@ -1256,19 +1267,21 @@ function RefillScreen({
           )}
 
           <div className="mt-4">
-            <WalletPicker
-              selected={selectedWallet}
-              onSelect={onSelectWallet}
-              disabled={refilling}
-              hideMiniPay
-              labels={walletLabels}
-            />
+            {!hideWalletPicker && (
+              <WalletPicker
+                selected={selectedWallet}
+                onSelect={onSelectWallet}
+                disabled={refilling}
+                hideMiniPay
+                labels={walletLabels}
+              />
+            )}
           </div>
 
           <button
             type="button"
             onClick={onRefill}
-            disabled={refilling || !canRefill || !selectedWallet}
+            disabled={refilling || !canRefill || (!hideWalletPicker && !selectedWallet)}
             className="btn-chunky mt-4 w-full rounded-2xl bg-prosperity py-4 font-display text-base font-bold text-h-background disabled:opacity-50"
           >
             {refilling
