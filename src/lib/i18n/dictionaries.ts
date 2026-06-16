@@ -450,14 +450,14 @@ const en: Dict = {
     firstStepHint: "I've never used blockchain",
     startNow: "Start now",
     startNowHint: "I already have a wallet",
-    minipayStartHint: "Your MiniPay wallet connects automatically",
-    chooseWallet: "I have a wallet — choose how to connect",
+    minipayStartHint: "Connects with MiniPay automatically",
+    chooseWallet: "I have a wallet — pick one",
     connectWith: "Connect",
     poweredBy: "Built on Celo",
     stats: [
       { value: "150+", label: "Questions" },
-      { value: "5", label: "Daily quests" },
-      { value: "3", label: "USDC / week" },
+      { value: "5", label: "Per day" },
+      { value: "3", label: "USDC/wk" },
     ],
   },
   onboarding: {

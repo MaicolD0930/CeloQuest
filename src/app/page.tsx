@@ -22,20 +22,20 @@ export default function LandingPage() {
   }, [router]);
 
   return (
-    <main className="home-perfil landing-page relative flex min-h-dvh flex-1 flex-col overflow-hidden safe-top">
+    <main className="home-perfil landing-page relative flex min-h-dvh w-full min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto safe-top">
       <LandingBackground />
 
       <header className="relative z-10 flex justify-end px-4 pb-2">
         <LanguageToggle variant="perfil" />
       </header>
 
-      <section className="relative z-10 mx-auto flex flex-1 flex-col items-center px-4 pb-10 pt-4 text-center">
+      <section className="relative z-10 mx-auto flex w-full min-w-0 max-w-full flex-1 flex-col items-center px-4 pb-10 pt-4 text-center">
         <div className="animate-card-pop">
           <DraggableOctopus imageSrc="/images/octopus.png" />
         </div>
 
         <h1
-          className="animate-card-pop mt-6 font-display text-5xl font-black tracking-tight"
+          className="animate-card-pop mt-6 max-w-full font-display text-4xl font-black tracking-tight sm:text-5xl"
           style={{ animationDelay: "120ms" }}
         >
           <span className="landing-brand-celo">Celo</span>
@@ -43,20 +43,20 @@ export default function LandingPage() {
         </h1>
 
         <p
-          className="animate-card-pop mt-4 max-w-xs text-base font-semibold text-h-muted"
+          className="animate-card-pop mt-4 max-w-xs text-pretty text-base font-semibold leading-snug text-h-muted"
           style={{ animationDelay: "200ms" }}
         >
           {t.landing.tagline}
         </p>
 
         <div
-          className="animate-card-pop mt-8 grid w-full grid-cols-3 gap-3"
+          className="animate-card-pop mt-8 grid w-full min-w-0 max-w-full grid-cols-3 gap-2 sm:gap-3"
           style={{ animationDelay: "280ms" }}
         >
           {t.landing.stats.map((s, i) => (
             <div
               key={s.label}
-              className="rounded-2xl bg-surface px-2 py-3 ring-1 ring-h-border card-depth-sm"
+              className="min-w-0 rounded-2xl bg-surface px-1.5 py-3 ring-1 ring-h-border card-depth-sm sm:px-2"
             >
               <div
                 className={`font-display text-lg font-extrabold ${
@@ -65,15 +65,15 @@ export default function LandingPage() {
               >
                 {s.value}
               </div>
-              <div className="text-[10px] font-bold uppercase tracking-wider text-h-muted">
-                {s.label}
+              <div className="mt-0.5 text-[10px] font-semibold leading-tight text-h-muted">
+                <span className="line-clamp-2 break-words">{s.label}</span>
               </div>
             </div>
           ))}
         </div>
 
         <div
-          className="animate-card-pop mt-10 flex w-full flex-col gap-3.5"
+          className="animate-card-pop mt-10 flex w-full min-w-0 max-w-full flex-col gap-3.5"
           style={{ animationDelay: "360ms" }}
         >
           {miniPay ? (
@@ -93,7 +93,7 @@ export default function LandingPage() {
                 title={t.landing.firstStep}
                 subtitle={t.landing.firstStepHint}
               />
-              <p className="text-center text-xs font-bold uppercase tracking-wide text-h-muted">
+              <p className="text-pretty text-center text-xs font-bold text-h-muted">
                 {t.landing.chooseWallet}
               </p>
               <div className="grid grid-cols-2 gap-3">
@@ -180,9 +180,9 @@ function LandingCTA({
         aria-hidden
         className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent opacity-0 transition-[transform,opacity] duration-700 group-hover:translate-x-full group-hover:opacity-100"
       />
-      <div className="relative flex items-center gap-3.5 px-5 py-4">
+      <div className="relative flex min-w-0 items-center gap-3 px-4 py-4 sm:gap-3.5 sm:px-5">
         <span
-          className={`grid size-11 shrink-0 place-items-center rounded-xl text-xl transition-transform duration-200 group-hover:scale-110 ${
+          className={`grid size-10 shrink-0 place-items-center rounded-xl text-xl transition-transform duration-200 group-hover:scale-110 sm:size-11 ${
             isPrimary
               ? "bg-h-background/15 ring-1 ring-h-background/20"
               : "bg-prosperity/15 ring-1 ring-prosperity/25"
@@ -192,14 +192,14 @@ function LandingCTA({
         </span>
         <div className="min-w-0 flex-1 text-left">
           <div
-            className={`truncate font-display text-base font-bold leading-tight ${
+            className={`font-display text-[15px] font-bold leading-tight sm:text-base ${
               isPrimary ? "text-h-background" : "text-h-foreground"
             }`}
           >
             {title}
           </div>
           <div
-            className={`mt-0.5 truncate text-xs font-semibold ${
+            className={`mt-0.5 line-clamp-2 text-pretty text-[11px] font-semibold leading-snug sm:text-xs ${
               isPrimary ? "text-h-background/75" : "text-prosperity"
             }`}
           >
