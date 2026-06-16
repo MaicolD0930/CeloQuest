@@ -71,7 +71,7 @@ export async function verifyRecoveryPayment(
   });
 
   let receipt;
-  const delays = [0, 2000, 4000];
+  const delays = [0, 2000, 4000, 8000, 12000, 20000, 30000];
   for (const delayMs of delays) {
     if (delayMs > 0) await new Promise((r) => setTimeout(r, delayMs));
     try {

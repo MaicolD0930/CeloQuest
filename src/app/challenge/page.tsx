@@ -389,7 +389,7 @@ export default function ChallengePage() {
       return t.challenge.refillPaymentNotConfigured;
     }
     if (apiError === "TX_ALREADY_USED" || apiError === "REFILL_ALREADY_USED") {
-      return t.challenge.refillError;
+      return t.challenge.refillAlreadyUsed;
     }
     if (err instanceof Error) {
       switch (err.message) {
@@ -464,24 +464,38 @@ export default function ChallengePage() {
         walletId,
         payerWallet ?? undefined
       );
-      const res = await fetch("/api/challenge/refill", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ txHash, token: paidToken }),
-      });
-      if (!res.ok) {
-        let apiError: string | undefined;
+
+      let refillData: Record<string, unknown> | null = null;
+      let refillApiError: string | undefined;
+      const refillAttempts = 8;
+      for (let attempt = 0; attempt < refillAttempts; attempt++) {
+        if (attempt > 0) {
+          await new Promise((r) => setTimeout(r, 3000));
+        }
+        const res = await fetch("/api/challenge/refill", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ txHash, token: paidToken }),
+        });
+        if (res.ok) {
+          refillData = await res.json();
+          break;
+        }
         try {
           const body = await res.json();
-          apiError = typeof body.error === "string" ? body.error : undefined;
+          refillApiError = typeof body.error === "string" ? body.error : undefined;
         } catch {
-          apiError = undefined;
+          refillApiError = undefined;
         }
-        setRefillError(refillErrorMessage(null, apiError));
+        if (refillApiError !== "TX_NOT_FOUND") break;
+      }
+
+      if (!refillData) {
+        setRefillError(refillErrorMessage(null, refillApiError));
         return;
       }
-      const data = await res.json();
+      const data = refillData;
       setLivesLeft(data.livesLeft);
       setAwaitingRefill(false);
       setCanRefill(false);

@@ -56,6 +56,53 @@ function shouldUseLegacyTransactions(providerId?: WalletProviderId): boolean {
   return providerId === "minipay" || isMiniPay();
 }
 
+const RECEIPT_POLL_MS = [0, 1500, 3000, 5000, 8000];
+
+/** Poll for a receipt without failing when the RPC is slow (common in MiniPay). */
+async function waitForReceiptSoft(
+  publicClient: ReturnType<typeof createPublicClient>,
+  hash: Hash
+): Promise<"success" | "reverted" | "pending"> {
+  for (const delayMs of RECEIPT_POLL_MS) {
+    if (delayMs > 0) await new Promise((r) => setTimeout(r, delayMs));
+    try {
+      const receipt = await publicClient.getTransactionReceipt({ hash });
+      if (receipt.status === "reverted") return "reverted";
+      return "success";
+    } catch {
+      // receipt not indexed yet
+    }
+  }
+  return "pending";
+}
+
+async function waitForAllowanceAfterApprove(
+  publicClient: ReturnType<typeof createPublicClient>,
+  tokenAddress: `0x${string}`,
+  account: `0x${string}`,
+  spender: `0x${string}`,
+  required: bigint,
+  approveHash: Hash
+): Promise<void> {
+  const receiptStatus = await waitForReceiptSoft(publicClient, approveHash);
+  if (receiptStatus === "reverted") throw new Error("TX_FAILED");
+
+  if (receiptStatus === "success") return;
+
+  for (let i = 0; i < 8; i++) {
+    await new Promise((r) => setTimeout(r, 2000));
+    const allowance = await publicClient.readContract({
+      address: tokenAddress,
+      abi: erc20ExtendedAbi,
+      functionName: "allowance",
+      args: [account, spender],
+    });
+    if (allowance >= required) return;
+  }
+
+  throw new Error("TX_NOT_FOUND");
+}
+
 async function sendWalletTransaction(
   walletClient: ReturnType<typeof createWalletClient>,
   publicClient: ReturnType<typeof createPublicClient>,
@@ -171,7 +218,14 @@ async function ensureTokenAllowance(
     providerId
   );
 
-  await publicClient.waitForTransactionReceipt({ hash: approveHash });
+  await waitForAllowanceAfterApprove(
+    publicClient,
+    tokenAddress,
+    account,
+    spender,
+    required,
+    approveHash
+  );
 }
 
 /**
@@ -240,7 +294,8 @@ export async function sendRecoveryPayment(
     providerId
   );
 
-  await publicClient.waitForTransactionReceipt({ hash });
+  const receiptStatus = await waitForReceiptSoft(publicClient, hash);
+  if (receiptStatus === "reverted") throw new Error("TX_FAILED");
 
   return { hash, token: prepared.token };
 }
