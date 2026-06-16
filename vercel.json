@@ -1,6 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
+  "installCommand": "npm install && if [ \"$VERCEL\" = \"1\" ]; then npm uninstall hardhat @nomicfoundation/hardhat-toolbox @openzeppelin/contracts --no-save; fi",
   "buildCommand": "prisma generate && prisma migrate deploy && next build",
   "crons": [
     {
