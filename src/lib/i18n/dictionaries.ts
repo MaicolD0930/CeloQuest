@@ -101,6 +101,8 @@ const es = {
     minipaySubtitle: "Entra con la wallet que ya tienes en MiniPay",
     minipayRetry: "Reintentar conexión",
     errorGeneric: "Algo salió mal. Intenta de nuevo.",
+    serverError:
+      "No pudimos conectar con el servidor. Revisa tu conexión o inténtalo en unos minutos.",
     usernameRequired: "Escribe un nombre de al menos 3 caracteres",
     continueToApp: "Entrar a CeloQuest",
     continuing: "Entrando...",
@@ -541,6 +543,8 @@ const en: Dict = {
     minipaySubtitle: "Sign in with the wallet you already have in MiniPay",
     minipayRetry: "Retry connection",
     errorGeneric: "Something went wrong. Try again.",
+    serverError:
+      "We could not reach the server. Check your connection or try again in a few minutes.",
     usernameRequired: "Enter a name with at least 3 characters",
     continueToApp: "Enter CeloQuest",
     continuing: "Entering...",

@@ -16,76 +16,85 @@ import {
 const AVATARS = ["🦊", "🐸", "🦁", "🐼", "🦄", "🐙", "🦉", "🐢"];
 
 export async function POST(req: NextRequest) {
-  const body = await req.json().catch(() => null);
-  if (!body) {
-    return NextResponse.json({ error: "Invalid body" }, { status: 400 });
-  }
+  try {
+    const body = await req.json().catch(() => null);
+    if (!body) {
+      return NextResponse.json({ error: "Invalid body" }, { status: 400 });
+    }
 
-  const walletAddress =
-    typeof body.walletAddress === "string" && body.walletAddress.length > 0
-      ? normalizeWalletAddress(body.walletAddress)
-      : null;
+    const walletAddress =
+      typeof body.walletAddress === "string" && body.walletAddress.length > 0
+        ? normalizeWalletAddress(body.walletAddress)
+        : null;
 
-  if (!walletAddress) {
-    return NextResponse.json({ error: "WALLET_REQUIRED" }, { status: 400 });
-  }
+    if (!walletAddress) {
+      return NextResponse.json({ error: "WALLET_REQUIRED" }, { status: 400 });
+    }
 
-  // Returning wallet user: log in directly.
-  const existing = await findUserByWallet(walletAddress);
-  if (existing) {
+    // Returning wallet user: log in directly.
+    const existing = await findUserByWallet(walletAddress);
+    if (existing) {
+      try {
+        await ensureActiveSeason();
+      } catch (e) {
+        console.error("ensureActiveSeason failed:", e);
+      }
+      await normalizeUserWalletIfNeeded(existing.id, existing.walletAddress);
+      const res = NextResponse.json({ user: existing, returning: true });
+      setUserCookie(res, existing.id);
+      return res;
+    }
+
+    const username = normalizeUsername(
+      typeof body.username === "string" ? body.username : ""
+    );
+
+    // Wallet connected but profile not created yet.
+    if (!username) {
+      return NextResponse.json({ needsProfile: true, walletAddress });
+    }
+    const formatError = validateUsernameFormat(username);
+    if (formatError) {
+      return NextResponse.json({ error: formatError }, { status: 400 });
+    }
+
+    const taken = await prisma.user.findUnique({ where: { username } });
+    if (taken) {
+      return NextResponse.json({ error: "TAKEN" }, { status: 409 });
+    }
+
+    const avatar =
+      typeof body.avatar === "string" && AVATARS.includes(body.avatar)
+        ? body.avatar
+        : AVATARS[0];
+    const locale = body.locale === "en" ? "en" : "es";
+
     try {
       await ensureActiveSeason();
     } catch (e) {
-      console.error("ensureActiveSeason failed:", e);
+      console.error("ensureActiveSeason failed on signup:", e);
     }
-    await normalizeUserWalletIfNeeded(existing.id, existing.walletAddress);
-    const res = NextResponse.json({ user: existing, returning: true });
-    setUserCookie(res, existing.id);
+
+    const user = await prisma.user.create({
+      data: {
+        username,
+        walletAddress,
+        avatar,
+        locale,
+        currentWeekKey: weekKey(),
+      },
+    });
+
+    const { maybeAwardFirstWallet } = await import("@/lib/achievements");
+    await maybeAwardFirstWallet(user.id, locale);
+
+    const res = NextResponse.json({ user, returning: false }, { status: 201 });
+    setUserCookie(res, user.id);
     return res;
+  } catch (e) {
+    console.error("POST /api/users error:", e);
+    return NextResponse.json({ error: "SERVER_ERROR" }, { status: 500 });
   }
-
-  const username = normalizeUsername(
-    typeof body.username === "string" ? body.username : ""
-  );
-
-  // Wallet connected but profile not created yet.
-  if (!username) {
-    return NextResponse.json({ needsProfile: true, walletAddress });
-  }
-  const formatError = validateUsernameFormat(username);
-  if (formatError) {
-    return NextResponse.json({ error: formatError }, { status: 400 });
-  }
-
-  const taken = await prisma.user.findUnique({ where: { username } });
-  if (taken) {
-    return NextResponse.json({ error: "TAKEN" }, { status: 409 });
-  }
-
-  const avatar =
-    typeof body.avatar === "string" && AVATARS.includes(body.avatar)
-      ? body.avatar
-      : AVATARS[0];
-  const locale = body.locale === "en" ? "en" : "es";
-
-  await ensureActiveSeason();
-
-  const user = await prisma.user.create({
-    data: {
-      username,
-      walletAddress,
-      avatar,
-      locale,
-      currentWeekKey: weekKey(),
-    },
-  });
-
-  const { maybeAwardFirstWallet } = await import("@/lib/achievements");
-  await maybeAwardFirstWallet(user.id, locale);
-
-  const res = NextResponse.json({ user, returning: false }, { status: 201 });
-  setUserCookie(res, user.id);
-  return res;
 }
 
 function setUserCookie(res: NextResponse, userId: string) {

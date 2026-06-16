@@ -83,6 +83,8 @@ export default function ConnectPage() {
         return t.connect.usernameInvalid;
       case "WALLET_REQUIRED":
         return t.connect.walletRequired;
+      case "SERVER_ERROR":
+        return t.connect.serverError;
       default:
         return t.connect.errorGeneric;
     }
@@ -115,7 +117,6 @@ export default function ConnectPage() {
     if (!res.ok) {
       const code = typeof data.error === "string" ? data.error : "UNKNOWN";
       setError(usernameErrorMessage(code));
-      if (res.status >= 500) setNeedsProfile(true);
       return "error" as const;
     }
 

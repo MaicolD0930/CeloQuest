@@ -7,7 +7,7 @@
     "dev": "next dev",
     "build": "prisma generate && prisma migrate deploy && next build",
     "start": "next start",
-    "lint": "eslint",
+    "lint": "eslint src",
     "db:seed": "tsx prisma/seed.ts",
     "db:seed:force": "tsx prisma/seed.ts --force",
     "db:setup": "prisma migrate deploy && tsx prisma/seed.ts",
