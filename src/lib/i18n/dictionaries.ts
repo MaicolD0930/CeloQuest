@@ -362,7 +362,11 @@ const es = {
     refillApprovePending:
       "Aún confirmando la aprobación en MiniPay. Espera unos segundos e inténtalo de nuevo.",
     refillWalletTxFailed:
-      "MiniPay no pudo completar el envío. No es por USDC: con tCOPM el gas también sale de tu saldo. Confirma solo una ventana de pago.",
+      "MiniPay no pudo enviar la transacción. Revisa el detalle entre corchetes.",
+    minipayCustomTcopm:
+      "MiniPay no puede enviar tCOPM de prueba (token personalizado). Consigue USDC en MiniPay (Mento) o abre CeloQuest en MetaMask con la misma wallet.",
+    minipayCustomTcopmHint:
+      "Tu saldo tCOPM es del contrato de prueba de CeloQuest. MiniPay solo envía USDC/USDm oficiales — usa USDC aquí o MetaMask para tCOPM.",
     minipayAmountHint:
       "MiniPay puede mostrar muchos ceros: es normal. El importe real es el del selector (ej. 355 tCOPM ≈ 0.10 USD).",
     refillInvalidPayment: "El pago no coincide con tu cuenta o el monto esperado",
@@ -818,7 +822,11 @@ const en: Dict = {
     refillApprovePending:
       "Still confirming the approval in MiniPay. Wait a few seconds and try again.",
     refillWalletTxFailed:
-      "MiniPay could not complete the send. This is not about USDC: with tCOPM gas is also paid from your balance. Confirm only one payment popup.",
+      "MiniPay could not send the transaction. See the detail in brackets.",
+    minipayCustomTcopm:
+      "MiniPay cannot send test tCOPM (custom token). Get USDC in MiniPay (Mento) or open CeloQuest in MetaMask with the same wallet.",
+    minipayCustomTcopmHint:
+      "Your tCOPM balance is from CeloQuest's test contract. MiniPay only sends official USDC/USDm — use USDC here or MetaMask for tCOPM.",
     minipayAmountHint:
       "MiniPay may show many zeros — that's normal. The real amount is in the selector (e.g. 355 tCOPM ≈ 0.10 USD).",
     refillInvalidPayment: "Payment does not match your account or the expected amount",

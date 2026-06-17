@@ -15,6 +15,7 @@ import {
   type RecoveryPaymentRecord,
 } from "@/lib/payments/record-payment";
 import { decodeRecoveryPaymentFromReceipt, decodeDirectTransferFromReceipt } from "@/lib/payments/verify-recovery-receipt";
+import { resolveRecoveryVerifyTokenAddresses } from "@/lib/chain/minipay-tokens";
 import { resolveTreasuryAddress } from "@/lib/payments/prepare-recovery";
 
 export { RECOVERY_DEMO_MODE, getRecoveryTokenAddress, getRecoveryTreasury };
@@ -62,8 +63,12 @@ export async function verifyRecoveryPayment(
   const tokenId = normalizeRecoveryTokenParam(token);
   const tokenAddress = resolveTokenAddress(token);
   const treasuryAddress = await resolveTreasuryAddress();
+  const verifyTokenAddresses =
+    tokenAddress != null
+      ? resolveRecoveryVerifyTokenAddresses(tokenId, tokenAddress)
+      : [];
 
-  if (!contractAddress || !tokenAddress) {
+  if (!contractAddress || !tokenAddress || verifyTokenAddresses.length === 0) {
     return { ok: false, reason: "PAYMENT_NOT_CONFIGURED" };
   }
 
@@ -95,31 +100,49 @@ export async function verifyRecoveryPayment(
     const contractDecoded = decodeRecoveryPaymentFromReceipt(receipt, {
       txHash: normalizedHash,
       contractAddress,
-      tokenAddress,
+      tokenAddress: verifyTokenAddresses[0],
       fromWallet,
       minPrice,
       tokenParam: token,
     });
+
+    if (!contractDecoded.ok) {
+      for (const alt of verifyTokenAddresses.slice(1)) {
+        const altDecoded = decodeRecoveryPaymentFromReceipt(receipt, {
+          txHash: normalizedHash,
+          contractAddress,
+          tokenAddress: alt,
+          fromWallet,
+          minPrice,
+          tokenParam: token,
+        });
+        if (altDecoded.ok) {
+          return altDecoded;
+        }
+      }
+    }
 
     if (contractDecoded.ok) {
       return contractDecoded;
     }
 
     if (treasuryAddress) {
-      const directDecoded = decodeDirectTransferFromReceipt(receipt, {
-        txHash: normalizedHash,
-        tokenAddress,
-        treasuryAddress,
-        fromWallet,
-        minPrice,
-        tokenParam: token,
-      });
+      for (const verifyAddress of verifyTokenAddresses) {
+        const directDecoded = decodeDirectTransferFromReceipt(receipt, {
+          txHash: normalizedHash,
+          tokenAddress: verifyAddress,
+          treasuryAddress,
+          fromWallet,
+          minPrice,
+          tokenParam: token,
+        });
 
-      if (directDecoded.ok) {
-        return directDecoded;
+        if (directDecoded.ok) {
+          return directDecoded;
+        }
+
+        lastReason = directDecoded.reason;
       }
-
-      lastReason = directDecoded.reason;
     } else {
       lastReason = contractDecoded.reason;
     }

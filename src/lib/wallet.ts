@@ -38,6 +38,10 @@ import {
 } from "@/lib/payments/prepare-recovery";
 import { getMiniPayFeeCurrency } from "@/lib/chain/fee-currency";
 import {
+  isCustomSepoliaTcopm,
+  resolveMiniPaySendTokenAddress,
+} from "@/lib/chain/minipay-tokens";
+import {
   normalizeWalletTxError,
   sendMiniPayTransaction,
 } from "@/lib/wallet/minipay-tx";
@@ -178,6 +182,7 @@ async function sendWalletTransaction(
       from: params.account,
       to: params.to,
       data: params.data,
+      chain: params.chain,
     });
   }
 
@@ -377,6 +382,15 @@ async function sendMiniPayDirectTransfer(
   });
   if (balance < required) throw new Error("INSUFFICIENT_BALANCE");
 
+  if (isCustomSepoliaTcopm(prepared.tokenAddress)) {
+    throw new Error("MINIPAY_CUSTOM_TCOPM");
+  }
+
+  const sendTokenAddress = resolveMiniPaySendTokenAddress(
+    prepared.token,
+    prepared.tokenAddress
+  );
+
   const data = encodeFunctionData({
     abi: erc20ExtendedAbi,
     functionName: "transfer",
@@ -387,8 +401,9 @@ async function sendMiniPayDirectTransfer(
 
   return sendMiniPayTransaction(provider, {
     from: account,
-    to: prepared.tokenAddress,
+    to: sendTokenAddress,
     data,
+    chain: getActiveChain(),
     ...(feeCurrency ? { feeCurrency } : {}),
   });
 }

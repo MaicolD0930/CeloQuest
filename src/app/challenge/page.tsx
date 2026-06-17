@@ -32,6 +32,7 @@ import {
 } from "@/lib/client/challenge-cache";
 import { WalletPicker } from "@/components/WalletPicker";
 import { useIsMiniPay } from "@/hooks/useIsMiniPay";
+import { isCustomSepoliaTcopm } from "@/lib/chain/minipay-tokens";
 import {
   sendRecoveryPayment,
   type RecoveryToken,
@@ -230,7 +231,14 @@ export default function ChallengePage() {
         if (ids.length > 0) {
           setRecoveryTokens(ids);
           let preferred = ids[0];
-          for (const id of ids) {
+          const tokenOrder = miniPay
+            ? [...ids].sort((a, b) => {
+                if (a === "USDC") return -1;
+                if (b === "USDC") return 1;
+                return 0;
+              })
+            : ids;
+          for (const id of tokenOrder) {
             try {
               const balRes = await fetch(
                 `/api/wallet/recovery-balance?token=${encodeURIComponent(id)}`,
@@ -241,10 +249,17 @@ export default function ChallengePage() {
               if (typeof bal.requiredDisplay === "string") {
                 labels[id] = bal.requiredDisplay;
               }
-              if (bal.sufficient) {
-                preferred = id;
-                break;
+              if (!bal.sufficient) continue;
+              if (
+                miniPay &&
+                id === "tCOPM" &&
+                typeof bal.tokenAddress === "string" &&
+                isCustomSepoliaTcopm(bal.tokenAddress)
+              ) {
+                continue;
               }
+              preferred = id;
+              break;
             } catch {
               continue;
             }
@@ -436,6 +451,8 @@ export default function ChallengePage() {
           return miniPay
             ? t.challenge.refillApprovePending
             : t.challenge.refillTxNotFound;
+        case "MINIPAY_CUSTOM_TCOPM":
+          return t.challenge.minipayCustomTcopm;
         case "WALLET_TX_FAILED":
           return miniPay
             ? t.challenge.refillWalletTxFailed
@@ -443,6 +460,11 @@ export default function ChallengePage() {
         case "PREPARE_FAILED":
           return t.challenge.refillError;
         default:
+          if (err.message.startsWith("WALLET_TX_FAILED")) {
+            return miniPay
+              ? t.challenge.refillWalletTxFailed
+              : t.challenge.refillError;
+          }
           break;
       }
     }
@@ -508,6 +530,15 @@ export default function ChallengePage() {
                 : undefined
             )
           );
+          return;
+        }
+        if (
+          miniPay &&
+          selectedToken === "tCOPM" &&
+          typeof bal.tokenAddress === "string" &&
+          isCustomSepoliaTcopm(bal.tokenAddress)
+        ) {
+          setRefillError(t.challenge.minipayCustomTcopm);
           return;
         }
       }
@@ -712,7 +743,13 @@ export default function ChallengePage() {
               install: t.connect.installWallet,
             }}
             hideWalletPicker={miniPay}
-            minipayHint={miniPay ? t.challenge.minipayAmountHint : undefined}
+            minipayHint={
+              miniPay
+                ? selectedToken === "tCOPM"
+                  ? t.challenge.minipayCustomTcopmHint
+                  : t.challenge.minipayAmountHint
+                : undefined
+            }
           />
         </main>
         <BottomNav variant="perfil" />
