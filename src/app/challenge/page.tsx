@@ -229,8 +229,27 @@ export default function ChallengePage() {
         if (Object.keys(labels).length > 0) setTokenPriceLabels(labels);
         if (ids.length > 0) {
           setRecoveryTokens(ids);
-          const preferred =
-            miniPay && ids.includes("USDC") ? "USDC" : ids[0];
+          let preferred = ids[0];
+          for (const id of ids) {
+            try {
+              const balRes = await fetch(
+                `/api/wallet/recovery-balance?token=${encodeURIComponent(id)}`,
+                { credentials: "include" }
+              );
+              if (!balRes.ok) continue;
+              const bal = await balRes.json();
+              if (typeof bal.requiredDisplay === "string") {
+                labels[id] = bal.requiredDisplay;
+              }
+              if (bal.sufficient) {
+                preferred = id;
+                break;
+              }
+            } catch {
+              continue;
+            }
+          }
+          if (Object.keys(labels).length > 0) setTokenPriceLabels(labels);
           setSelectedToken(preferred);
         }
       }

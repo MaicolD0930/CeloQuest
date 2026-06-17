@@ -388,6 +388,7 @@ async function sendMiniPayDirectTransfer(
     to: prepared.tokenAddress,
     data,
     chain: getActiveChain(),
+    feeCurrency: prepared.tokenAddress,
   });
 }
 

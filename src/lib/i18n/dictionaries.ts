@@ -362,9 +362,9 @@ const es = {
     refillApprovePending:
       "Aún confirmando la aprobación en MiniPay. Espera unos segundos e inténtalo de nuevo.",
     refillWalletTxFailed:
-      "MiniPay no pudo enviar el pago. Si tienes USDC, elígelo en el menú (≈0.10 USDC).",
+      "MiniPay no pudo enviar el pago con tCOPM/USDC. Revisa que tengas saldo suficiente (precio en el selector).",
     minipayAmountHint:
-      "MiniPay puede mostrar muchos ceros en pantalla; el importe real es el que ves arriba (≈0.10 USD).",
+      "MiniPay puede mostrar muchos ceros: es normal. El importe real es el del selector (ej. 355 tCOPM ≈ 0.10 USD).",
     refillInvalidPayment: "El pago no coincide con tu cuenta o el monto esperado",
     refillTxFailed: "La transacción falló on-chain",
     refillTxNotFound: "No encontramos la transacción en la red. Espera unos segundos e intenta de nuevo",
@@ -818,9 +818,9 @@ const en: Dict = {
     refillApprovePending:
       "Still confirming the approval in MiniPay. Wait a few seconds and try again.",
     refillWalletTxFailed:
-      "MiniPay could not send the payment. If you have USDC, select it in the menu (≈0.10 USDC).",
+      "MiniPay could not send payment with tCOPM/USDC. Check you have enough balance (price in the selector).",
     minipayAmountHint:
-      "MiniPay may show many zeros on screen; the real amount is shown above (≈0.10 USD).",
+      "MiniPay may show many zeros — that's normal. The real amount is in the selector (e.g. 355 tCOPM ≈ 0.10 USD).",
     refillInvalidPayment: "Payment does not match your account or the expected amount",
     refillTxFailed: "The on-chain transaction failed",
     refillTxNotFound: "Transaction not found on-chain yet. Wait a few seconds and try again",

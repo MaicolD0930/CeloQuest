@@ -38,18 +38,21 @@ export function normalizeWalletTxError(err: unknown): Error {
   return new Error(`WALLET_TX_FAILED:${detail}`);
 }
 
+type MiniPayTxParams = {
+  from: `0x${string}`;
+  to: `0x${string}`;
+  data: `0x${string}`;
+  chain: Chain;
+  /** Pay network fee in this stablecoin (Celo fee abstraction). */
+  feeCurrency?: `0x${string}`;
+};
+
 /**
- * MiniPay: legacy Celo tx via viem (fee abstraction + correct encoding).
- * Falls back to plain eth_sendTransaction when viem is rejected.
+ * MiniPay: legacy Celo tx via viem. Use feeCurrency so gas is paid in tCOPM/USDC.
  */
 export async function sendMiniPayTransaction(
   provider: EIP1193Provider,
-  params: {
-    from: `0x${string}`;
-    to: `0x${string}`;
-    data: `0x${string}`;
-    chain: Chain;
-  }
+  params: MiniPayTxParams
 ): Promise<Hash> {
   const walletClient = createWalletClient({
     account: params.from,
@@ -57,26 +60,32 @@ export async function sendMiniPayTransaction(
     transport: custom(provider),
   });
 
+  const tx = {
+    account: params.from,
+    chain: params.chain,
+    to: params.to,
+    data: params.data,
+    type: "legacy" as const,
+    ...(params.feeCurrency ? { feeCurrency: params.feeCurrency } : {}),
+  };
+
   try {
-    return await walletClient.sendTransaction({
-      account: params.from,
-      chain: params.chain,
-      to: params.to,
-      data: params.data,
-      type: "legacy",
-    });
+    return await walletClient.sendTransaction(tx);
   } catch (viemErr) {
     try {
+      const rawParams: Record<string, string> = {
+        from: params.from,
+        to: params.to,
+        data: params.data,
+        value: "0x0",
+      };
+      if (params.feeCurrency) {
+        rawParams.feeCurrency = params.feeCurrency;
+      }
+
       const hash = await provider.request({
         method: "eth_sendTransaction",
-        params: [
-          {
-            from: params.from,
-            to: params.to,
-            data: params.data,
-            value: "0x0",
-          },
-        ],
+        params: [rawParams],
       });
 
       if (typeof hash === "string" && hash.startsWith("0x")) {
