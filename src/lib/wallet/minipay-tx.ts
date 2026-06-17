@@ -1,4 +1,10 @@
-import type { EIP1193Provider, Hash } from "viem";
+import {
+  createWalletClient,
+  custom,
+  type Chain,
+  type EIP1193Provider,
+  type Hash,
+} from "viem";
 
 /** Map viem / provider errors to stable codes for the UI. */
 export function normalizeWalletTxError(err: unknown): Error {
@@ -13,19 +19,28 @@ export function normalizeWalletTxError(err: unknown): Error {
   if (code === 4001 || msg.includes("reject") || msg.includes("denied")) {
     return new Error("USER_REJECTED");
   }
-  if (msg.includes("allowance") || msg.includes("insufficient allowance")) {
+  if (
+    msg.includes("insufficient") ||
+    msg.includes("exceeds balance") ||
+    msg.includes("not enough") ||
+    msg.includes("funds")
+  ) {
+    return new Error("INSUFFICIENT_BALANCE");
+  }
+  if (msg.includes("allowance")) {
     return new Error("APPROVE_PENDING");
   }
   if (msg.includes("revert") || msg.includes("execution reverted")) {
     return new Error("TX_FAILED");
   }
 
-  return new Error("WALLET_TX_FAILED");
+  const detail = err.message.replace(/\s+/g, " ").slice(0, 72);
+  return new Error(`WALLET_TX_FAILED:${detail}`);
 }
 
 /**
- * MiniPay expects a plain eth_sendTransaction without EIP-1559 fields.
- * Viem may attach extra properties that MiniPay rejects.
+ * MiniPay: legacy Celo tx via viem (fee abstraction + correct encoding).
+ * Falls back to plain eth_sendTransaction when viem is rejected.
  */
 export async function sendMiniPayTransaction(
   provider: EIP1193Provider,
@@ -33,26 +48,44 @@ export async function sendMiniPayTransaction(
     from: `0x${string}`;
     to: `0x${string}`;
     data: `0x${string}`;
+    chain: Chain;
   }
 ): Promise<Hash> {
-  try {
-    const hash = await provider.request({
-      method: "eth_sendTransaction",
-      params: [
-        {
-          from: params.from,
-          to: params.to,
-          data: params.data,
-        },
-      ],
-    });
+  const walletClient = createWalletClient({
+    account: params.from,
+    chain: params.chain,
+    transport: custom(provider),
+  });
 
-    if (typeof hash !== "string" || !hash.startsWith("0x")) {
-      throw new Error("WALLET_TX_FAILED");
+  try {
+    return await walletClient.sendTransaction({
+      account: params.from,
+      chain: params.chain,
+      to: params.to,
+      data: params.data,
+      type: "legacy",
+    });
+  } catch (viemErr) {
+    try {
+      const hash = await provider.request({
+        method: "eth_sendTransaction",
+        params: [
+          {
+            from: params.from,
+            to: params.to,
+            data: params.data,
+            value: "0x0",
+          },
+        ],
+      });
+
+      if (typeof hash === "string" && hash.startsWith("0x")) {
+        return hash as Hash;
+      }
+    } catch (rawErr) {
+      throw normalizeWalletTxError(rawErr);
     }
 
-    return hash as Hash;
-  } catch (err) {
-    throw normalizeWalletTxError(err);
+    throw normalizeWalletTxError(viemErr);
   }
 }

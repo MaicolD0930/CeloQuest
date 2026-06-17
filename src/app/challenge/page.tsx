@@ -229,7 +229,9 @@ export default function ChallengePage() {
         if (Object.keys(labels).length > 0) setTokenPriceLabels(labels);
         if (ids.length > 0) {
           setRecoveryTokens(ids);
-          setSelectedToken(ids[0]);
+          const preferred =
+            miniPay && ids.includes("USDC") ? "USDC" : ids[0];
+          setSelectedToken(preferred);
         }
       }
       if (typeof data.priceUsd === "number") {
@@ -439,8 +441,13 @@ export default function ChallengePage() {
     if (!miniPay) return base;
     const code =
       apiError ??
-      (err instanceof Error && err.message.length <= 40 ? err.message : undefined);
-    return code && code !== base ? `${base} [${code}]` : base;
+      (err instanceof Error ? err.message.split(":")[0] : undefined);
+    const detail =
+      err instanceof Error && err.message.includes(":")
+        ? err.message.slice(err.message.indexOf(":") + 1).trim()
+        : apiError;
+    if (!miniPay) return base;
+    return detail && detail !== base ? `${base} [${detail}]` : code ? `${base} [${code}]` : base;
   }
 
   function handleSelectWallet(id: WalletProviderId) {
@@ -686,6 +693,7 @@ export default function ChallengePage() {
               install: t.connect.installWallet,
             }}
             hideWalletPicker={miniPay}
+            minipayHint={miniPay ? t.challenge.minipayAmountHint : undefined}
           />
         </main>
         <BottomNav variant="perfil" />
@@ -1183,6 +1191,7 @@ function RefillScreen({
   onSelectWallet,
   walletLabels,
   hideWalletPicker = false,
+  minipayHint,
 }: {
   title: string;
   body: string;
@@ -1213,6 +1222,7 @@ function RefillScreen({
   onSelectWallet: (id: WalletProviderId) => void;
   walletLabels: { chooseWallet: string; notInstalled: string; install: string };
   hideWalletPicker?: boolean;
+  minipayHint?: string;
 }) {
   return (
     <div className="flex flex-1 flex-col">
@@ -1246,6 +1256,11 @@ function RefillScreen({
             ⚡ {recoverLabel}
           </p>
           <p className="mt-1 text-center text-xs text-h-muted">{refillNote}</p>
+          {minipayHint ? (
+            <p className="mt-2 text-center text-[11px] font-semibold leading-snug text-lemon">
+              {minipayHint}
+            </p>
+          ) : null}
           {tokenBalance && (
             <p className="mt-2 text-center text-xs font-semibold text-h-foreground">
               {balanceLabel}:{" "}

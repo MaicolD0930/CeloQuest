@@ -177,6 +177,7 @@ async function sendWalletTransaction(
       from: params.account,
       to: params.to,
       data: params.data,
+      chain: params.chain,
     });
   }
 
@@ -386,6 +387,7 @@ async function sendMiniPayDirectTransfer(
     from: account,
     to: prepared.tokenAddress,
     data,
+    chain: getActiveChain(),
   });
 }
 
