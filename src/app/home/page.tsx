@@ -21,6 +21,7 @@ import { LanguageToggle } from "@/components/LanguageToggle";
 import { HomePageSkeleton } from "@/components/skeletons/PageSkeletons";
 import { BottomNav } from "@/components/BottomNav";
 import { ProfileMenu } from "@/components/ProfileMenu";
+import { AppVersionBadge } from "@/components/AppVersionBadge";
 import { ChallengeCompletedCard } from "@/components/ChallengeCompletedCard";
 import { useMe } from "@/hooks/useMe";
 import { prefetchChallengeToday } from "@/lib/client/challenge-cache";
@@ -144,6 +145,9 @@ export default function HomePage() {
                 {user.username}{" "}
                 <span className="inline-block animate-bob">👋</span>
               </h1>
+              <div className="mt-1">
+                <AppVersionBadge label={t.common.versions} />
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-2">

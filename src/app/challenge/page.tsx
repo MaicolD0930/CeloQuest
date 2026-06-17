@@ -411,6 +411,10 @@ export default function ChallengePage() {
           return t.challenge.refillTxFailed;
         case "TX_NOT_FOUND":
           return t.challenge.refillTxNotFound;
+        case "APPROVE_PENDING":
+          return miniPay
+            ? t.challenge.refillApprovePending
+            : t.challenge.refillTxNotFound;
         case "PREPARE_FAILED":
           return t.challenge.refillError;
         default:

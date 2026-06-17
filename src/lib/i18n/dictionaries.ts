@@ -359,6 +359,8 @@ const es = {
     refillError: "No se pudo verificar el pago. Intenta de nuevo.",
     refillAlreadyUsed:
       "Este pago ya se registró. Recarga la página o continúa el reto si ya recuperaste la vida.",
+    refillApprovePending:
+      "Aún confirmando la aprobación en MiniPay. Espera unos segundos e inténtalo de nuevo.",
     refillInvalidPayment: "El pago no coincide con tu cuenta o el monto esperado",
     refillTxFailed: "La transacción falló on-chain",
     refillTxNotFound: "No encontramos la transacción en la red. Espera unos segundos e intenta de nuevo",
@@ -429,6 +431,8 @@ const es = {
   },
   common: {
     appName: "CeloQuest",
+    version: "Versión",
+    versions: "Versiones",
     loading: "Cargando...",
     error: "Algo salió mal",
     retry: "Reintentar",
@@ -807,6 +811,8 @@ const en: Dict = {
     refillError: "Could not verify payment. Try again.",
     refillAlreadyUsed:
       "This payment was already recorded. Refresh the page or continue if your life was restored.",
+    refillApprovePending:
+      "Still confirming the approval in MiniPay. Wait a few seconds and try again.",
     refillInvalidPayment: "Payment does not match your account or the expected amount",
     refillTxFailed: "The on-chain transaction failed",
     refillTxNotFound: "Transaction not found on-chain yet. Wait a few seconds and try again",
@@ -877,6 +883,8 @@ const en: Dict = {
   },
   common: {
     appName: "CeloQuest",
+    version: "Version",
+    versions: "Versions",
     loading: "Loading...",
     error: "Something went wrong",
     retry: "Retry",

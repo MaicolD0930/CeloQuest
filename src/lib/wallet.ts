@@ -119,11 +119,16 @@ async function waitForAllowanceAfterApprove(
   );
   if (receiptStatus === "reverted") throw new Error("TX_FAILED");
 
-  if (receiptStatus === "success") return;
+  const miniPay = isMiniPayPayment(providerId);
+  // MiniPay often returns the approve receipt before allowance is readable.
+  if (miniPay) {
+    await new Promise((r) => setTimeout(r, 3000));
+  }
 
-  const allowancePolls = isMiniPayPayment(providerId) ? 12 : 8;
+  const allowancePolls = miniPay ? 30 : 15;
+  const pollMs = miniPay ? 2000 : 1500;
+
   for (let i = 0; i < allowancePolls; i++) {
-    await new Promise((r) => setTimeout(r, 2000));
     const allowance = await publicClient.readContract({
       address: tokenAddress,
       abi: erc20ExtendedAbi,
@@ -131,9 +136,10 @@ async function waitForAllowanceAfterApprove(
       args: [account, spender],
     });
     if (allowance >= required) return;
+    await new Promise((r) => setTimeout(r, pollMs));
   }
 
-  throw new Error("TX_NOT_FOUND");
+  throw new Error("APPROVE_PENDING");
 }
 
 async function sendWalletTransaction(
@@ -143,6 +149,7 @@ async function sendWalletTransaction(
     to: `0x${string}`;
     data: `0x${string}`;
     chain: Chain;
+    feeCurrency?: `0x${string}`;
   },
   providerId?: WalletProviderId
 ): Promise<Hash> {
@@ -157,6 +164,7 @@ async function sendWalletTransaction(
     return walletClient.sendTransaction({
       ...base,
       type: "legacy",
+      ...(params.feeCurrency ? { feeCurrency: params.feeCurrency } : {}),
     });
   }
 
@@ -240,6 +248,7 @@ async function ensureTokenAllowance(
       account,
       to: tokenAddress,
       data: approveData,
+      feeCurrency: isMiniPayPayment(providerId) ? tokenAddress : undefined,
     },
     providerId
   );
@@ -314,6 +323,7 @@ export async function sendRecoveryPayment(
       account,
       to: prepared.contractAddress,
       data,
+      feeCurrency: miniPayPay ? prepared.tokenAddress : undefined,
     },
     providerId
   );

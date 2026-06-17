@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n/LocaleProvider";
 import { invalidateChallengeCache } from "@/lib/client/challenge-cache";
 import { invalidateMeCache } from "@/lib/client/me-cache";
+import { AppVersionBadge } from "@/components/AppVersionBadge";
 
 type Props = {
   username: string;
@@ -98,6 +99,11 @@ export function ProfileMenu({
             >
               {shortWallet}
             </p>
+            {variant === "perfil" ? (
+              <div className="mt-2">
+                <AppVersionBadge label={t.common.versions} />
+              </div>
+            ) : null}
           </div>
 
           <Link
