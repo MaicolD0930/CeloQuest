@@ -1,10 +1,4 @@
-import {
-  createWalletClient,
-  custom,
-  type Chain,
-  type EIP1193Provider,
-  type Hash,
-} from "viem";
+import type { EIP1193Provider, Hash } from "viem";
 
 /** Map viem / provider errors to stable codes for the UI. */
 export function normalizeWalletTxError(err: unknown): Error {
@@ -34,7 +28,7 @@ export function normalizeWalletTxError(err: unknown): Error {
     return new Error("TX_FAILED");
   }
 
-  const detail = err.message.replace(/\s+/g, " ").slice(0, 72);
+  const detail = err.message.replace(/\s+/g, " ").slice(0, 120);
   return new Error(`WALLET_TX_FAILED:${detail}`);
 }
 
@@ -42,59 +36,40 @@ type MiniPayTxParams = {
   from: `0x${string}`;
   to: `0x${string}`;
   data: `0x${string}`;
-  chain: Chain;
-  /** Pay network fee in this stablecoin (Celo fee abstraction). */
+  /** Pay network fee in this stablecoin adapter (USDC only). Omit for tCOPM — MiniPay auto-selects. */
   feeCurrency?: `0x${string}`;
 };
 
 /**
- * MiniPay: legacy Celo tx via viem. Use feeCurrency so gas is paid in tCOPM/USDC.
+ * MiniPay: single eth_sendTransaction (one confirmation popup).
+ * Do not chain viem + raw — that caused duplicate popups and confusing failures.
  */
 export async function sendMiniPayTransaction(
   provider: EIP1193Provider,
   params: MiniPayTxParams
 ): Promise<Hash> {
-  const walletClient = createWalletClient({
-    account: params.from,
-    chain: params.chain,
-    transport: custom(provider),
-  });
-
-  const tx = {
-    account: params.from,
-    chain: params.chain,
+  const rawParams: Record<string, string> = {
+    from: params.from,
     to: params.to,
     data: params.data,
-    type: "legacy" as const,
-    ...(params.feeCurrency ? { feeCurrency: params.feeCurrency } : {}),
+    value: "0x0",
   };
+  if (params.feeCurrency) {
+    rawParams.feeCurrency = params.feeCurrency;
+  }
 
   try {
-    return await walletClient.sendTransaction(tx);
-  } catch (viemErr) {
-    try {
-      const rawParams: Record<string, string> = {
-        from: params.from,
-        to: params.to,
-        data: params.data,
-        value: "0x0",
-      };
-      if (params.feeCurrency) {
-        rawParams.feeCurrency = params.feeCurrency;
-      }
+    const hash = await provider.request({
+      method: "eth_sendTransaction",
+      params: [rawParams],
+    });
 
-      const hash = await provider.request({
-        method: "eth_sendTransaction",
-        params: [rawParams],
-      });
-
-      if (typeof hash === "string" && hash.startsWith("0x")) {
-        return hash as Hash;
-      }
-    } catch (rawErr) {
-      throw normalizeWalletTxError(rawErr);
+    if (typeof hash === "string" && hash.startsWith("0x")) {
+      return hash as Hash;
     }
 
-    throw normalizeWalletTxError(viemErr);
+    throw new Error("MiniPay returned an invalid transaction hash");
+  } catch (err) {
+    throw normalizeWalletTxError(err);
   }
 }

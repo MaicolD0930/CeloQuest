@@ -36,6 +36,7 @@ import {
   encodePurchaseRecovery,
   type PreparedRecoveryPayment,
 } from "@/lib/payments/prepare-recovery";
+import { getMiniPayFeeCurrency } from "@/lib/chain/fee-currency";
 import {
   normalizeWalletTxError,
   sendMiniPayTransaction,
@@ -177,7 +178,6 @@ async function sendWalletTransaction(
       from: params.account,
       to: params.to,
       data: params.data,
-      chain: params.chain,
     });
   }
 
@@ -383,12 +383,13 @@ async function sendMiniPayDirectTransfer(
     args: [prepared.treasuryAddress, required],
   });
 
+  const feeCurrency = getMiniPayFeeCurrency(prepared.token);
+
   return sendMiniPayTransaction(provider, {
     from: account,
     to: prepared.tokenAddress,
     data,
-    chain: getActiveChain(),
-    feeCurrency: prepared.tokenAddress,
+    ...(feeCurrency ? { feeCurrency } : {}),
   });
 }
 

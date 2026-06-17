@@ -362,7 +362,7 @@ const es = {
     refillApprovePending:
       "Aún confirmando la aprobación en MiniPay. Espera unos segundos e inténtalo de nuevo.",
     refillWalletTxFailed:
-      "MiniPay no pudo enviar el pago con tCOPM/USDC. Revisa que tengas saldo suficiente (precio en el selector).",
+      "MiniPay no pudo completar el envío. No es por USDC: con tCOPM el gas también sale de tu saldo. Confirma solo una ventana de pago.",
     minipayAmountHint:
       "MiniPay puede mostrar muchos ceros: es normal. El importe real es el del selector (ej. 355 tCOPM ≈ 0.10 USD).",
     refillInvalidPayment: "El pago no coincide con tu cuenta o el monto esperado",
@@ -818,7 +818,7 @@ const en: Dict = {
     refillApprovePending:
       "Still confirming the approval in MiniPay. Wait a few seconds and try again.",
     refillWalletTxFailed:
-      "MiniPay could not send payment with tCOPM/USDC. Check you have enough balance (price in the selector).",
+      "MiniPay could not complete the send. This is not about USDC: with tCOPM gas is also paid from your balance. Confirm only one payment popup.",
     minipayAmountHint:
       "MiniPay may show many zeros — that's normal. The real amount is in the selector (e.g. 355 tCOPM ≈ 0.10 USD).",
     refillInvalidPayment: "Payment does not match your account or the expected amount",
