@@ -465,6 +465,9 @@ export default function ChallengePage() {
 
   function refillErrorMessage(err: unknown, apiError?: string): string {
     if (apiError === "INVALID_PAYMENT") return t.challenge.refillInvalidPayment;
+    if (apiError === "SERVER_ERROR" || apiError?.startsWith("HTTP_5")) {
+      return t.challenge.refillServerRetry;
+    }
     if (apiError === "TX_FAILED") return t.challenge.refillTxFailed;
     if (apiError === "TX_NOT_FOUND") return t.challenge.refillTxNotFound;
     if (apiError === "PAYMENT_NOT_CONFIGURED") {

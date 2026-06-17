@@ -36,15 +36,18 @@ const RECEIPT_POLL_MS = [
   0, 400, 800, 1200, 2000, 3000, 4000, 5000, 6000, 8000, 10000,
 ];
 
+/** Fast poll for API routes (must finish within Vercel Hobby ~10s). */
+export const API_REFILL_VERIFY_MS = 6500;
+
 function pollSchedule(maxWaitMs?: number): number[] {
   if (!maxWaitMs || maxWaitMs <= 0) return RECEIPT_POLL_MS;
   const delays = [0];
   let total = 0;
-  let step = 400;
+  let step = 350;
   while (total < maxWaitMs) {
     delays.push(step);
     total += step;
-    step = Math.min(step + 300, 2000);
+    step = Math.min(step + 250, 1500);
   }
   return delays;
 }

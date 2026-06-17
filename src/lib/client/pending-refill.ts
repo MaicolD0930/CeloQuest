@@ -53,16 +53,15 @@ export type RefillApiSuccess = {
   activeDurationMs?: number;
 };
 
-/** POST /api/challenge/refill with timeout; retries TX_NOT_FOUND / INVALID_PAYMENT. */
+/** POST /api/challenge/refill with timeout; retries until receipt is indexed. */
 export async function postRefillUntilConfirmed(
   txHash: string,
   token: RecoveryTokenId,
   options?: { maxAttempts?: number; retryDelayMs?: number; fetchTimeoutMs?: number }
 ): Promise<{ ok: true; data: RefillApiSuccess } | { ok: false; error?: string }> {
-  const maxAttempts = options?.maxAttempts ?? 20;
-  const retryDelayMs = options?.retryDelayMs ?? 3000;
-  const fetchTimeoutMs = options?.fetchTimeoutMs ?? 55_000;
-  const retryable = new Set(["TX_NOT_FOUND", "INVALID_PAYMENT"]);
+  const maxAttempts = options?.maxAttempts ?? 24;
+  const retryDelayMs = options?.retryDelayMs ?? 2500;
+  const fetchTimeoutMs = options?.fetchTimeoutMs ?? 12_000;
 
   let lastError: string | undefined;
 
@@ -95,11 +94,15 @@ export async function postRefillUntilConfirmed(
         lastError = `HTTP_${res.status}`;
       }
 
-      if (lastError === "REFILL_ALREADY_USED" || lastError === "TX_ALREADY_USED") {
+      if (lastError === "REFILL_ALREADY_USED") {
         return { ok: false, error: lastError };
       }
 
-      if (!lastError || !retryable.has(lastError)) {
+      if (lastError === "TX_ALREADY_USED") {
+        return { ok: false, error: lastError };
+      }
+
+      if (!shouldRetryRefill(lastError, res.status)) {
         return { ok: false, error: lastError };
       }
     } catch (err) {
@@ -108,11 +111,26 @@ export async function postRefillUntilConfirmed(
       } else {
         lastError = "NETWORK_ERROR";
       }
-      // Retry timeouts / network blips.
     } finally {
       clearTimeout(timer);
     }
   }
 
   return { ok: false, error: lastError ?? "TX_NOT_FOUND" };
+}
+
+function shouldRetryRefill(error: string | undefined, status: number): boolean {
+  if (!error) return true;
+  if (
+    error === "TX_NOT_FOUND" ||
+    error === "INVALID_PAYMENT" ||
+    error === "REQUEST_TIMEOUT" ||
+    error === "NETWORK_ERROR" ||
+    error === "SERVER_ERROR"
+  ) {
+    return true;
+  }
+  if (error.startsWith("HTTP_5")) return true;
+  if (status >= 500) return true;
+  return false;
 }

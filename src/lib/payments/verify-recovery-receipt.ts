@@ -79,6 +79,7 @@ export function decodeDirectTransferFromReceipt(
   const user = params.fromWallet.toLowerCase();
   const token = params.tokenAddress.toLowerCase();
   const treasury = params.treasuryAddress.toLowerCase();
+  const txFrom = receipt.from?.toLowerCase();
 
   for (const log of receipt.logs) {
     if (log.address.toLowerCase() !== token) continue;
@@ -91,8 +92,11 @@ export function decodeDirectTransferFromReceipt(
         topics: log.topics,
       });
 
+      const transferFrom = decoded.args.from.toLowerCase();
+      const senderOk = transferFrom === user || (!!txFrom && txFrom === user);
+
       if (
-        decoded.args.from.toLowerCase() === user &&
+        senderOk &&
         decoded.args.to.toLowerCase() === treasury &&
         decoded.args.value >= params.minPrice
       ) {
@@ -100,7 +104,7 @@ export function decodeDirectTransferFromReceipt(
           ok: true,
           payment: buildPaymentRecordFromEvent({
             txHash: params.txHash,
-            userWallet: decoded.args.from,
+            userWallet: params.fromWallet,
             tokenAddress: params.tokenAddress,
             amountAtomic: decoded.args.value,
             tokenParam: params.tokenParam,

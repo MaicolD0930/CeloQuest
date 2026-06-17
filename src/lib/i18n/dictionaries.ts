@@ -370,6 +370,8 @@ const es = {
     minipayAmountHint:
       "MiniPay puede mostrar muchos ceros: es normal. El importe real es el del selector (ej. 355 tCOPM ≈ 0.10 USD).",
     refillInvalidPayment: "El pago no coincide con tu cuenta o el monto esperado",
+    refillServerRetry:
+      "El servidor tardó en confirmar el pago. No pagues otra vez: espera unos segundos o vuelve a Jugar.",
     refillTxFailed: "La transacción falló on-chain",
     refillTxNotFound: "No encontramos la transacción en la red. Espera unos segundos e intenta de nuevo",
     refillNotConfigured: "Pagos no configurados. Contacta al administrador",
@@ -830,6 +832,8 @@ const en: Dict = {
     minipayAmountHint:
       "MiniPay may show many zeros — that's normal. The real amount is in the selector (e.g. 355 tCOPM ≈ 0.10 USD).",
     refillInvalidPayment: "Payment does not match your account or the expected amount",
+    refillServerRetry:
+      "The server is still confirming your payment. Do not pay again — wait a few seconds or return to Play.",
     refillTxFailed: "The on-chain transaction failed",
     refillTxNotFound: "Transaction not found on-chain yet. Wait a few seconds and try again",
     refillNotConfigured: "Payments are not configured. Contact the administrator",
