@@ -63,10 +63,6 @@ function isMiniPayPayment(providerId?: WalletProviderId): boolean {
   return providerId === "minipay" || isMiniPay();
 }
 
-function shouldUseLegacyTransactions(providerId?: WalletProviderId): boolean {
-  return isMiniPayPayment(providerId);
-}
-
 function resolveReadClient(
   provider: EIP1193Provider,
   providerId?: WalletProviderId
