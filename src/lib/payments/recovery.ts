@@ -14,7 +14,8 @@ import {
   recordRecoveryPayment,
   type RecoveryPaymentRecord,
 } from "@/lib/payments/record-payment";
-import { decodeRecoveryPaymentFromReceipt } from "@/lib/payments/verify-recovery-receipt";
+import { decodeRecoveryPaymentFromReceipt, decodeDirectTransferFromReceipt } from "@/lib/payments/verify-recovery-receipt";
+import { resolveTreasuryAddress } from "@/lib/payments/prepare-recovery";
 
 export { RECOVERY_DEMO_MODE, getRecoveryTokenAddress, getRecoveryTreasury };
 
@@ -60,6 +61,7 @@ export async function verifyRecoveryPayment(
   const contractAddress = getRecoveryContractAddress();
   const tokenId = normalizeRecoveryTokenParam(token);
   const tokenAddress = resolveTokenAddress(token);
+  const treasuryAddress = await resolveTreasuryAddress();
 
   if (!contractAddress || !tokenAddress) {
     return { ok: false, reason: "PAYMENT_NOT_CONFIGURED" };
@@ -90,7 +92,7 @@ export async function verifyRecoveryPayment(
       return { ok: false, reason: "TX_FAILED" };
     }
 
-    const decoded = decodeRecoveryPaymentFromReceipt(receipt, {
+    const contractDecoded = decodeRecoveryPaymentFromReceipt(receipt, {
       txHash: normalizedHash,
       contractAddress,
       tokenAddress,
@@ -99,11 +101,28 @@ export async function verifyRecoveryPayment(
       tokenParam: token,
     });
 
-    if (decoded.ok) {
-      return decoded;
+    if (contractDecoded.ok) {
+      return contractDecoded;
     }
 
-    lastReason = decoded.reason;
+    if (treasuryAddress) {
+      const directDecoded = decodeDirectTransferFromReceipt(receipt, {
+        txHash: normalizedHash,
+        tokenAddress,
+        treasuryAddress,
+        fromWallet,
+        minPrice,
+        tokenParam: token,
+      });
+
+      if (directDecoded.ok) {
+        return directDecoded;
+      }
+
+      lastReason = directDecoded.reason;
+    } else {
+      lastReason = contractDecoded.reason;
+    }
     // Receipt mined but logs not indexed yet — keep polling.
   }
 

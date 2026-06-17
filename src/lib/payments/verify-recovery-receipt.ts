@@ -1,5 +1,6 @@
 import { decodeEventLog, type TransactionReceipt } from "viem";
 import { recoveryPaymentAbi } from "@/lib/contracts/recovery-payment-abi";
+import { erc20ExtendedAbi } from "@/lib/contracts/recovery-payment-abi";
 import {
   buildPaymentRecordFromEvent,
   type RecoveryPaymentRecord,
@@ -54,6 +55,60 @@ export function decodeRecoveryPaymentFromReceipt(
       }
     } catch {
       // not a RecoveryPurchased log
+    }
+  }
+
+  return { ok: false, reason: "INVALID_PAYMENT" };
+}
+
+/**
+ * MiniPay workaround: verify ERC-20 transfer to treasury (approve + contract
+ * call is unreliable inside the MiniPay webview).
+ */
+export function decodeDirectTransferFromReceipt(
+  receipt: TransactionReceipt,
+  params: {
+    txHash: `0x${string}`;
+    tokenAddress: `0x${string}`;
+    treasuryAddress: `0x${string}`;
+    fromWallet: string;
+    minPrice: bigint;
+    tokenParam: string;
+  }
+): DecodeResult {
+  const user = params.fromWallet.toLowerCase();
+  const token = params.tokenAddress.toLowerCase();
+  const treasury = params.treasuryAddress.toLowerCase();
+
+  for (const log of receipt.logs) {
+    if (log.address.toLowerCase() !== token) continue;
+
+    try {
+      const decoded = decodeEventLog({
+        abi: erc20ExtendedAbi,
+        eventName: "Transfer",
+        data: log.data,
+        topics: log.topics,
+      });
+
+      if (
+        decoded.args.from.toLowerCase() === user &&
+        decoded.args.to.toLowerCase() === treasury &&
+        decoded.args.value >= params.minPrice
+      ) {
+        return {
+          ok: true,
+          payment: buildPaymentRecordFromEvent({
+            txHash: params.txHash,
+            userWallet: decoded.args.from,
+            tokenAddress: params.tokenAddress,
+            amountAtomic: decoded.args.value,
+            tokenParam: params.tokenParam,
+          }),
+        };
+      }
+    } catch {
+      // not a Transfer log
     }
   }
 

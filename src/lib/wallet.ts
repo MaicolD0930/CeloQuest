@@ -358,6 +358,37 @@ async function sendPurchaseWithRetries(
   throw normalizeWalletTxError(lastError);
 }
 
+/** MiniPay: single ERC-20 transfer to treasury (no approve + contract call). */
+async function sendMiniPayDirectTransfer(
+  provider: EIP1193Provider,
+  account: `0x${string}`,
+  prepared: PreparedRecoveryPayment & { walletAddress: string },
+  providerId?: WalletProviderId
+): Promise<Hash> {
+  const required = BigInt(prepared.recoveryPrice);
+  const providerClient = resolveReadClient(provider, providerId);
+
+  const balance = await providerClient.readContract({
+    address: prepared.tokenAddress,
+    abi: erc20ExtendedAbi,
+    functionName: "balanceOf",
+    args: [account],
+  });
+  if (balance < required) throw new Error("INSUFFICIENT_BALANCE");
+
+  const data = encodeFunctionData({
+    abi: erc20ExtendedAbi,
+    functionName: "transfer",
+    args: [prepared.treasuryAddress, required],
+  });
+
+  return sendMiniPayTransaction(provider, {
+    from: account,
+    to: prepared.tokenAddress,
+    data,
+  });
+}
+
 export async function sendRecoveryPayment(
   token: RecoveryTokenId,
   providerId?: WalletProviderId,
@@ -392,6 +423,23 @@ export async function sendRecoveryPayment(
   const expected = payer.toLowerCase();
   const account = accounts.find((a) => a.toLowerCase() === expected);
   if (!account) throw new Error("WALLET_MISMATCH");
+
+  if (miniPayPay) {
+    const hash = await sendMiniPayDirectTransfer(
+      provider,
+      account,
+      prepared,
+      providerId
+    );
+    const providerClient = resolveReadClient(provider, providerId);
+    const receiptStatus = await waitForReceiptSoft(
+      providerClient,
+      hash,
+      providerId
+    );
+    if (receiptStatus === "reverted") throw new Error("TX_FAILED");
+    return { hash, token: prepared.token };
+  }
 
   await ensureTokenAllowance(
     walletClient,
