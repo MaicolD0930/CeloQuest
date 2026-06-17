@@ -1,20 +1,11 @@
-import {
-  createPublicClient,
-  decodeEventLog,
-  http,
-  type Hash,
-} from "viem";
-import { getActiveChain, getRpcUrl } from "@/lib/chain/config";
-import { recoveryPaymentAbi } from "@/lib/contracts/recovery-payment-abi";
-import {
-  getRecoveryContractAddress,
-  readRecoveryPriceForToken,
-} from "@/lib/contracts/recovery-payment";
+import type { Hash } from "viem";
+import { createChainPublicClient, normalizeTxHash } from "@/lib/chain/public-client";
+import { getRecoveryContractAddress, readRecoveryPriceForToken } from "@/lib/contracts/recovery-payment";
 import { getRecoveryPriceAtomicAsync } from "@/lib/pricing/recovery-price";
 import {
-  getRecoveryTokenAddress,
   getRecoveryTreasury,
   RECOVERY_DEMO_MODE,
+  getRecoveryTokenAddress,
   normalizeRecoveryTokenParam,
   type RecoveryTokenId,
 } from "@/lib/tokens/recovery";
@@ -23,6 +14,7 @@ import {
   recordRecoveryPayment,
   type RecoveryPaymentRecord,
 } from "@/lib/payments/record-payment";
+import { decodeRecoveryPaymentFromReceipt } from "@/lib/payments/verify-recovery-receipt";
 
 export { RECOVERY_DEMO_MODE, getRecoveryTokenAddress, getRecoveryTreasury };
 
@@ -37,18 +29,26 @@ type VerifyResult =
   | { ok: true; payment: VerifiedRecoveryPayment }
   | { ok: false; reason: string };
 
+/** Poll delays for receipt + log indexing (MiniPay / mobile RPC can lag). */
+const RECEIPT_POLL_MS = [
+  0, 2000, 3000, 4000, 6000, 8000, 10000, 12000, 15000, 18000, 22000, 26000,
+  30000, 35000, 40000, 45000,
+];
+
 /** Verify RecoveryPurchased event and extract payment details. */
 export async function verifyRecoveryPayment(
   txHash: Hash,
   fromWallet: string,
   token: string
 ): Promise<VerifyResult> {
-  if (RECOVERY_DEMO_MODE && txHash === "0x" + "demo".repeat(21)) {
+  const normalizedHash = normalizeTxHash(txHash);
+
+  if (RECOVERY_DEMO_MODE && normalizedHash === "0x" + "demo".repeat(21)) {
     const tokenId = normalizeRecoveryTokenParam(token) as RecoveryTokenId;
     const tokenAddress = resolveTokenAddress(token);
     const amount = await getRecoveryPriceAtomicAsync(tokenId);
     const payment = buildPaymentRecordFromEvent({
-      txHash,
+      txHash: normalizedHash,
       userWallet: fromWallet,
       tokenAddress: tokenAddress ?? ("0x0" as `0x${string}`),
       amountAtomic: amount,
@@ -65,71 +65,49 @@ export async function verifyRecoveryPayment(
     return { ok: false, reason: "PAYMENT_NOT_CONFIGURED" };
   }
 
-  const client = createPublicClient({
-    chain: getActiveChain(),
-    transport: http(getRpcUrl()),
-  });
-
-  let receipt;
-  const delays = [0, 2000, 4000, 8000, 12000, 20000, 30000];
-  for (const delayMs of delays) {
-    if (delayMs > 0) await new Promise((r) => setTimeout(r, delayMs));
-    try {
-      receipt = await client.getTransactionReceipt({ hash: txHash });
-      break;
-    } catch {
-      if (delayMs === delays[delays.length - 1]) {
-        return { ok: false, reason: "TX_NOT_FOUND" };
-      }
-    }
-  }
-
-  if (!receipt) {
-    return { ok: false, reason: "TX_NOT_FOUND" };
-  }
-
-  if (receipt.status !== "success") {
-    return { ok: false, reason: "TX_FAILED" };
-  }
-
-  const user = fromWallet.toLowerCase();
+  const client = createChainPublicClient();
   const onChainMin = await readRecoveryPriceForToken(tokenAddress);
   const minPrice =
     onChainMin && onChainMin > BigInt(0)
       ? onChainMin
       : await getRecoveryPriceAtomicAsync(tokenId);
 
-  for (const log of receipt.logs) {
-    if (log.address.toLowerCase() !== contractAddress.toLowerCase()) continue;
+  let lastReason = "TX_NOT_FOUND";
 
-    try {
-      const decoded = decodeEventLog({
-        abi: recoveryPaymentAbi,
-        eventName: "RecoveryPurchased",
-        data: log.data,
-        topics: log.topics,
-      });
-
-      if (
-        decoded.args.user.toLowerCase() === user &&
-        decoded.args.token.toLowerCase() === tokenAddress.toLowerCase() &&
-        decoded.args.amount >= minPrice
-      ) {
-        const payment = buildPaymentRecordFromEvent({
-          txHash,
-          userWallet: decoded.args.user,
-          tokenAddress: decoded.args.token,
-          amountAtomic: decoded.args.amount,
-          tokenParam: token,
-        });
-        return { ok: true, payment };
-      }
-    } catch {
-      // not a RecoveryPurchased log
+  for (const delayMs of RECEIPT_POLL_MS) {
+    if (delayMs > 0) {
+      await new Promise((r) => setTimeout(r, delayMs));
     }
+
+    let receipt;
+    try {
+      receipt = await client.getTransactionReceipt({ hash: normalizedHash });
+    } catch {
+      continue;
+    }
+
+    if (receipt.status !== "success") {
+      return { ok: false, reason: "TX_FAILED" };
+    }
+
+    const decoded = decodeRecoveryPaymentFromReceipt(receipt, {
+      txHash: normalizedHash,
+      contractAddress,
+      tokenAddress,
+      fromWallet,
+      minPrice,
+      tokenParam: token,
+    });
+
+    if (decoded.ok) {
+      return decoded;
+    }
+
+    lastReason = decoded.reason;
+    // Receipt mined but logs not indexed yet — keep polling.
   }
 
-  return { ok: false, reason: "INVALID_PAYMENT" };
+  return { ok: false, reason: lastReason };
 }
 
 /** Verify payment, persist to DB, return result for API handlers. */

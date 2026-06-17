@@ -1,13 +1,17 @@
 import {
-  createPublicClient,
   createWalletClient,
   custom,
   encodeFunctionData,
-  http,
   type Hash,
   type Chain,
+  type EIP1193Provider,
+  type PublicClient,
 } from "viem";
-import { getActiveChain, getRpcUrl } from "@/lib/chain/config";
+import { getActiveChain } from "@/lib/chain/config";
+import {
+  createChainPublicClient,
+  createProviderPublicClient,
+} from "@/lib/chain/public-client";
 import { erc20ExtendedAbi } from "@/lib/contracts/recovery-payment-abi";
 import {
   getAvailableRecoveryTokens as getConfiguredRecoveryTokens,
@@ -51,19 +55,42 @@ export function isMiniPay(): boolean {
   return discoverWalletProviders().some((w) => w.id === "minipay" && w.installed);
 }
 
-/** MiniPay requires legacy txs (no maxFeePerGas / maxPriorityFeePerGas). */
-function shouldUseLegacyTransactions(providerId?: WalletProviderId): boolean {
+function isMiniPayPayment(providerId?: WalletProviderId): boolean {
   return providerId === "minipay" || isMiniPay();
 }
 
-const RECEIPT_POLL_MS = [0, 1500, 3000, 5000, 8000];
+/**
+ * MiniPay: legacy txs only; the wallet sets gas / feeCurrency internally.
+ * MetaMask / Rabby: default viem send (EIP-1559 when supported).
+ */
+function shouldUseLegacyTransactions(providerId?: WalletProviderId): boolean {
+  return isMiniPayPayment(providerId);
+}
+
+function resolveReadClient(
+  provider: EIP1193Provider,
+  providerId?: WalletProviderId
+): PublicClient {
+  if (isMiniPayPayment(providerId)) {
+    return createProviderPublicClient(provider);
+  }
+  return createChainPublicClient();
+}
+
+const MINIPAY_RECEIPT_POLL_MS = [0, 2000, 3000, 5000, 8000, 12000, 15000, 20000];
+const DEFAULT_RECEIPT_POLL_MS = [0, 1500, 3000, 5000, 8000];
 
 /** Poll for a receipt without failing when the RPC is slow (common in MiniPay). */
 async function waitForReceiptSoft(
-  publicClient: ReturnType<typeof createPublicClient>,
-  hash: Hash
+  publicClient: PublicClient,
+  hash: Hash,
+  providerId?: WalletProviderId
 ): Promise<"success" | "reverted" | "pending"> {
-  for (const delayMs of RECEIPT_POLL_MS) {
+  const delays = isMiniPayPayment(providerId)
+    ? MINIPAY_RECEIPT_POLL_MS
+    : DEFAULT_RECEIPT_POLL_MS;
+
+  for (const delayMs of delays) {
     if (delayMs > 0) await new Promise((r) => setTimeout(r, delayMs));
     try {
       const receipt = await publicClient.getTransactionReceipt({ hash });
@@ -77,19 +104,25 @@ async function waitForReceiptSoft(
 }
 
 async function waitForAllowanceAfterApprove(
-  publicClient: ReturnType<typeof createPublicClient>,
+  publicClient: PublicClient,
   tokenAddress: `0x${string}`,
   account: `0x${string}`,
   spender: `0x${string}`,
   required: bigint,
-  approveHash: Hash
+  approveHash: Hash,
+  providerId?: WalletProviderId
 ): Promise<void> {
-  const receiptStatus = await waitForReceiptSoft(publicClient, approveHash);
+  const receiptStatus = await waitForReceiptSoft(
+    publicClient,
+    approveHash,
+    providerId
+  );
   if (receiptStatus === "reverted") throw new Error("TX_FAILED");
 
   if (receiptStatus === "success") return;
 
-  for (let i = 0; i < 8; i++) {
+  const allowancePolls = isMiniPayPayment(providerId) ? 12 : 8;
+  for (let i = 0; i < allowancePolls; i++) {
     await new Promise((r) => setTimeout(r, 2000));
     const allowance = await publicClient.readContract({
       address: tokenAddress,
@@ -105,7 +138,6 @@ async function waitForAllowanceAfterApprove(
 
 async function sendWalletTransaction(
   walletClient: ReturnType<typeof createWalletClient>,
-  publicClient: ReturnType<typeof createPublicClient>,
   params: {
     account: `0x${string}`;
     to: `0x${string}`;
@@ -114,29 +146,26 @@ async function sendWalletTransaction(
   },
   providerId?: WalletProviderId
 ): Promise<Hash> {
-  if (shouldUseLegacyTransactions(providerId)) {
-    const gasPrice = await publicClient.getGasPrice();
-    return walletClient.sendTransaction({
-      chain: params.chain,
-      account: params.account,
-      to: params.to,
-      data: params.data,
-      type: "legacy",
-      gasPrice,
-    });
-  }
-
-  return walletClient.sendTransaction({
+  const base = {
     chain: params.chain,
     account: params.account,
     to: params.to,
     data: params.data,
-  });
+  };
+
+  if (shouldUseLegacyTransactions(providerId)) {
+    return walletClient.sendTransaction({
+      ...base,
+      type: "legacy",
+    });
+  }
+
+  return walletClient.sendTransaction(base);
 }
 
 export async function connectWallet(providerId?: WalletProviderId): Promise<string> {
   const provider = resolveWalletProvider(providerId);
-  const miniPayConnect = providerId === "minipay" || isMiniPay();
+  const miniPayConnect = isMiniPayPayment(providerId);
   try {
     await ensureCorrectChain(provider);
   } catch (err) {
@@ -170,16 +199,14 @@ async function fetchPreparedPayment(
 
 async function ensureTokenAllowance(
   walletClient: ReturnType<typeof createWalletClient>,
+  provider: EIP1193Provider,
   account: `0x${string}`,
   tokenAddress: `0x${string}`,
   spender: `0x${string}`,
   required: bigint,
   providerId?: WalletProviderId
 ): Promise<void> {
-  const publicClient = createPublicClient({
-    chain: getActiveChain(),
-    transport: http(getRpcUrl()),
-  });
+  const publicClient = resolveReadClient(provider, providerId);
 
   const balance = await publicClient.readContract({
     address: tokenAddress,
@@ -208,7 +235,6 @@ async function ensureTokenAllowance(
 
   const approveHash = await sendWalletTransaction(
     walletClient,
-    publicClient,
     {
       chain,
       account,
@@ -224,7 +250,8 @@ async function ensureTokenAllowance(
     account,
     spender,
     required,
-    approveHash
+    approveHash,
+    providerId
   );
 }
 
@@ -249,7 +276,7 @@ export async function sendRecoveryPayment(
   const required = BigInt(prepared.recoveryPrice);
 
   const provider = resolveWalletProvider(providerId);
-  const miniPayPay = providerId === "minipay" || isMiniPay();
+  const miniPayPay = isMiniPayPayment(providerId);
   if (miniPayPay) {
     await assertProviderOnActiveChain(provider);
   } else {
@@ -269,6 +296,7 @@ export async function sendRecoveryPayment(
 
   await ensureTokenAllowance(
     walletClient,
+    provider,
     account,
     prepared.tokenAddress,
     prepared.contractAddress,
@@ -278,13 +306,9 @@ export async function sendRecoveryPayment(
 
   const data = encodePurchaseRecovery(prepared.tokenAddress);
   const chain = getActiveChain();
-  const publicClient = createPublicClient({
-    chain,
-    transport: http(getRpcUrl()),
-  });
+  const publicClient = resolveReadClient(provider, providerId);
   const hash = await sendWalletTransaction(
     walletClient,
-    publicClient,
     {
       chain,
       account,
@@ -294,7 +318,7 @@ export async function sendRecoveryPayment(
     providerId
   );
 
-  const receiptStatus = await waitForReceiptSoft(publicClient, hash);
+  const receiptStatus = await waitForReceiptSoft(publicClient, hash, providerId);
   if (receiptStatus === "reverted") throw new Error("TX_FAILED");
 
   return { hash, token: prepared.token };

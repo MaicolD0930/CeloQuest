@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { Hash } from "viem";
+import { normalizeTxHash } from "@/lib/chain/public-client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/session";
 import { todayKey } from "@/lib/game";
@@ -13,7 +14,8 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => null);
-  const txHash = typeof body?.txHash === "string" ? body.txHash : null;
+  const rawHash = typeof body?.txHash === "string" ? body.txHash : null;
+  const txHash = rawHash ? normalizeTxHash(rawHash) : null;
   const token = normalizeRecoveryTokenParam(body?.token);
 
   if (!txHash) {
@@ -44,6 +46,12 @@ export async function POST(req: NextRequest) {
     token
   );
   if (!verification.ok) {
+    console.error("refill verification failed", {
+      reason: verification.reason,
+      txHash,
+      token,
+      wallet: user.walletAddress,
+    });
     return NextResponse.json({ error: verification.reason }, { status: 402 });
   }
 

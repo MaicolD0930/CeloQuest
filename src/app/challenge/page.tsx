@@ -407,11 +407,18 @@ export default function ChallengePage() {
           return insufficientBalanceMessage(selectedToken);
         case "PAYMENT_NOT_CONFIGURED":
           return t.challenge.refillNotConfigured;
+        case "TX_FAILED":
+          return t.challenge.refillTxFailed;
+        case "TX_NOT_FOUND":
+          return t.challenge.refillTxNotFound;
         case "PREPARE_FAILED":
           return t.challenge.refillError;
         default:
           break;
       }
+    }
+    if (apiError === "Refill not available") {
+      return t.challenge.refillNotAvailable;
     }
     return t.challenge.refillError;
   }
@@ -473,10 +480,13 @@ export default function ChallengePage() {
 
       let refillData: RefillResponse | null = null;
       let refillApiError: string | undefined;
-      const refillAttempts = 8;
+      const refillAttempts = miniPay ? 16 : 8;
+      const retryDelayMs = miniPay ? 4000 : 3000;
+      const retryableRefillErrors = new Set(["TX_NOT_FOUND", "INVALID_PAYMENT"]);
+
       for (let attempt = 0; attempt < refillAttempts; attempt++) {
         if (attempt > 0) {
-          await new Promise((r) => setTimeout(r, 3000));
+          await new Promise((r) => setTimeout(r, retryDelayMs));
         }
         const res = await fetch("/api/challenge/refill", {
           method: "POST",
@@ -494,7 +504,9 @@ export default function ChallengePage() {
         } catch {
           refillApiError = undefined;
         }
-        if (refillApiError !== "TX_NOT_FOUND") break;
+        if (!refillApiError || !retryableRefillErrors.has(refillApiError)) {
+          break;
+        }
       }
 
       if (!refillData) {

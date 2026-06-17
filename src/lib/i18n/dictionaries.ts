@@ -363,6 +363,8 @@ const es = {
     refillTxFailed: "La transacción falló on-chain",
     refillTxNotFound: "No encontramos la transacción en la red. Espera unos segundos e intenta de nuevo",
     refillNotConfigured: "Pagos no configurados. Contacta al administrador",
+    refillNotAvailable:
+      "El reintento ya no está disponible. Recarga la página para ver si tu vida se restauró.",
     refillPaymentNotConfigured:
       "Pagos on-chain no configurados en el servidor. Revisa las variables de entorno en Vercel",
     walletMismatch:
@@ -809,6 +811,8 @@ const en: Dict = {
     refillTxFailed: "The on-chain transaction failed",
     refillTxNotFound: "Transaction not found on-chain yet. Wait a few seconds and try again",
     refillNotConfigured: "Payments are not configured. Contact the administrator",
+    refillNotAvailable:
+      "Refill is no longer available. Refresh the page to see if your life was restored.",
     refillPaymentNotConfigured:
       "On-chain payments are not configured on the server. Check Vercel environment variables",
     walletMismatch:
