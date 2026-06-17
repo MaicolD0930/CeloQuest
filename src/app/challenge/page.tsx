@@ -415,6 +415,10 @@ export default function ChallengePage() {
           return miniPay
             ? t.challenge.refillApprovePending
             : t.challenge.refillTxNotFound;
+        case "WALLET_TX_FAILED":
+          return miniPay
+            ? t.challenge.refillWalletTxFailed
+            : t.challenge.refillError;
         case "PREPARE_FAILED":
           return t.challenge.refillError;
         default:
@@ -424,7 +428,19 @@ export default function ChallengePage() {
     if (apiError === "Refill not available") {
       return t.challenge.refillNotAvailable;
     }
+    if (apiError === "Not authenticated") {
+      return t.connect.errorGeneric;
+    }
     return t.challenge.refillError;
+  }
+
+  function formatRefillError(err: unknown, apiError?: string): string {
+    const base = refillErrorMessage(err, apiError);
+    if (!miniPay) return base;
+    const code =
+      apiError ??
+      (err instanceof Error && err.message.length <= 40 ? err.message : undefined);
+    return code && code !== base ? `${base} [${code}]` : base;
   }
 
   function handleSelectWallet(id: WalletProviderId) {
@@ -514,7 +530,7 @@ export default function ChallengePage() {
       }
 
       if (!refillData) {
-        setRefillError(refillErrorMessage(null, refillApiError));
+        setRefillError(formatRefillError(null, refillApiError));
         return;
       }
       const data = refillData;
@@ -529,7 +545,7 @@ export default function ChallengePage() {
       setSelected(null);
       await syncProgress();
     } catch (err) {
-      setRefillError(refillErrorMessage(err));
+      setRefillError(formatRefillError(err));
     } finally {
       setRefilling(false);
     }

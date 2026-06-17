@@ -361,6 +361,8 @@ const es = {
       "Este pago ya se registró. Recarga la página o continúa el reto si ya recuperaste la vida.",
     refillApprovePending:
       "Aún confirmando la aprobación en MiniPay. Espera unos segundos e inténtalo de nuevo.",
+    refillWalletTxFailed:
+      "MiniPay no pudo enviar la transacción de pago. Confirma el segundo popup o inténtalo de nuevo.",
     refillInvalidPayment: "El pago no coincide con tu cuenta o el monto esperado",
     refillTxFailed: "La transacción falló on-chain",
     refillTxNotFound: "No encontramos la transacción en la red. Espera unos segundos e intenta de nuevo",
@@ -813,6 +815,8 @@ const en: Dict = {
       "This payment was already recorded. Refresh the page or continue if your life was restored.",
     refillApprovePending:
       "Still confirming the approval in MiniPay. Wait a few seconds and try again.",
+    refillWalletTxFailed:
+      "MiniPay could not send the payment transaction. Confirm the second popup or try again.",
     refillInvalidPayment: "Payment does not match your account or the expected amount",
     refillTxFailed: "The on-chain transaction failed",
     refillTxNotFound: "Transaction not found on-chain yet. Wait a few seconds and try again",

@@ -36,6 +36,10 @@ import {
   encodePurchaseRecovery,
   type PreparedRecoveryPayment,
 } from "@/lib/payments/prepare-recovery";
+import {
+  normalizeWalletTxError,
+  sendMiniPayTransaction,
+} from "@/lib/wallet/minipay-tx";
 
 export type RecoveryToken = RecoveryTokenId;
 export type { WalletProviderId };
@@ -59,10 +63,6 @@ function isMiniPayPayment(providerId?: WalletProviderId): boolean {
   return providerId === "minipay" || isMiniPay();
 }
 
-/**
- * MiniPay: legacy txs only; the wallet sets gas / feeCurrency internally.
- * MetaMask / Rabby: default viem send (EIP-1559 when supported).
- */
 function shouldUseLegacyTransactions(providerId?: WalletProviderId): boolean {
   return isMiniPayPayment(providerId);
 }
@@ -80,7 +80,6 @@ function resolveReadClient(
 const MINIPAY_RECEIPT_POLL_MS = [0, 2000, 3000, 5000, 8000, 12000, 15000, 20000];
 const DEFAULT_RECEIPT_POLL_MS = [0, 1500, 3000, 5000, 8000];
 
-/** Poll for a receipt without failing when the RPC is slow (common in MiniPay). */
 async function waitForReceiptSoft(
   publicClient: PublicClient,
   hash: Hash,
@@ -103,8 +102,32 @@ async function waitForReceiptSoft(
   return "pending";
 }
 
+async function readTokenAllowance(
+  providerClient: PublicClient,
+  chainClient: PublicClient,
+  tokenAddress: `0x${string}`,
+  account: `0x${string}`,
+  spender: `0x${string}`
+): Promise<bigint> {
+  const read = async (client: PublicClient) =>
+    client.readContract({
+      address: tokenAddress,
+      abi: erc20ExtendedAbi,
+      functionName: "allowance",
+      args: [account, spender],
+    });
+
+  const [fromProvider, fromChain] = await Promise.all([
+    read(providerClient).catch(() => BigInt(0)),
+    read(chainClient).catch(() => BigInt(0)),
+  ]);
+
+  return fromProvider > fromChain ? fromProvider : fromChain;
+}
+
 async function waitForAllowanceAfterApprove(
-  publicClient: PublicClient,
+  providerClient: PublicClient,
+  chainClient: PublicClient,
   tokenAddress: `0x${string}`,
   account: `0x${string}`,
   spender: `0x${string}`,
@@ -113,28 +136,28 @@ async function waitForAllowanceAfterApprove(
   providerId?: WalletProviderId
 ): Promise<void> {
   const receiptStatus = await waitForReceiptSoft(
-    publicClient,
+    providerClient,
     approveHash,
     providerId
   );
   if (receiptStatus === "reverted") throw new Error("TX_FAILED");
 
   const miniPay = isMiniPayPayment(providerId);
-  // MiniPay often returns the approve receipt before allowance is readable.
   if (miniPay) {
-    await new Promise((r) => setTimeout(r, 3000));
+    await new Promise((r) => setTimeout(r, 5000));
   }
 
   const allowancePolls = miniPay ? 30 : 15;
   const pollMs = miniPay ? 2000 : 1500;
 
   for (let i = 0; i < allowancePolls; i++) {
-    const allowance = await publicClient.readContract({
-      address: tokenAddress,
-      abi: erc20ExtendedAbi,
-      functionName: "allowance",
-      args: [account, spender],
-    });
+    const allowance = await readTokenAllowance(
+      providerClient,
+      chainClient,
+      tokenAddress,
+      account,
+      spender
+    );
     if (allowance >= required) return;
     await new Promise((r) => setTimeout(r, pollMs));
   }
@@ -144,31 +167,33 @@ async function waitForAllowanceAfterApprove(
 
 async function sendWalletTransaction(
   walletClient: ReturnType<typeof createWalletClient>,
+  provider: EIP1193Provider,
   params: {
     account: `0x${string}`;
     to: `0x${string}`;
     data: `0x${string}`;
     chain: Chain;
-    feeCurrency?: `0x${string}`;
   },
   providerId?: WalletProviderId
 ): Promise<Hash> {
-  const base = {
-    chain: params.chain,
-    account: params.account,
-    to: params.to,
-    data: params.data,
-  };
-
-  if (shouldUseLegacyTransactions(providerId)) {
-    return walletClient.sendTransaction({
-      ...base,
-      type: "legacy",
-      ...(params.feeCurrency ? { feeCurrency: params.feeCurrency } : {}),
+  if (isMiniPayPayment(providerId)) {
+    return sendMiniPayTransaction(provider, {
+      from: params.account,
+      to: params.to,
+      data: params.data,
     });
   }
 
-  return walletClient.sendTransaction(base);
+  try {
+    return await walletClient.sendTransaction({
+      chain: params.chain,
+      account: params.account,
+      to: params.to,
+      data: params.data,
+    });
+  } catch (err) {
+    throw normalizeWalletTxError(err);
+  }
 }
 
 export async function connectWallet(providerId?: WalletProviderId): Promise<string> {
@@ -177,7 +202,6 @@ export async function connectWallet(providerId?: WalletProviderId): Promise<stri
   try {
     await ensureCorrectChain(provider);
   } catch (err) {
-    // MiniPay login uses wallet address only; chain switch may fail on mainnet.
     if (!miniPayConnect) throw err;
   }
   const client = createWalletClient({
@@ -214,9 +238,10 @@ async function ensureTokenAllowance(
   required: bigint,
   providerId?: WalletProviderId
 ): Promise<void> {
-  const publicClient = resolveReadClient(provider, providerId);
+  const providerClient = resolveReadClient(provider, providerId);
+  const chainClient = createChainPublicClient();
 
-  const balance = await publicClient.readContract({
+  const balance = await providerClient.readContract({
     address: tokenAddress,
     abi: erc20ExtendedAbi,
     functionName: "balanceOf",
@@ -224,12 +249,13 @@ async function ensureTokenAllowance(
   });
   if (balance < required) throw new Error("INSUFFICIENT_BALANCE");
 
-  const allowance = await publicClient.readContract({
-    address: tokenAddress,
-    abi: erc20ExtendedAbi,
-    functionName: "allowance",
-    args: [account, spender],
-  });
+  const allowance = await readTokenAllowance(
+    providerClient,
+    chainClient,
+    tokenAddress,
+    account,
+    spender
+  );
 
   if (allowance >= required) return;
 
@@ -243,18 +269,19 @@ async function ensureTokenAllowance(
 
   const approveHash = await sendWalletTransaction(
     walletClient,
+    provider,
     {
       chain,
       account,
       to: tokenAddress,
       data: approveData,
-      feeCurrency: isMiniPayPayment(providerId) ? tokenAddress : undefined,
     },
     providerId
   );
 
   await waitForAllowanceAfterApprove(
-    publicClient,
+    providerClient,
+    chainClient,
     tokenAddress,
     account,
     spender,
@@ -264,10 +291,77 @@ async function ensureTokenAllowance(
   );
 }
 
-/**
- * Approve (if needed) and call RecoveryPaymentContract.purchaseRecovery.
- * Returns tx hash and normalized token id.
- */
+async function sendPurchaseWithRetries(
+  walletClient: ReturnType<typeof createWalletClient>,
+  provider: EIP1193Provider,
+  providerClient: PublicClient,
+  chainClient: PublicClient,
+  params: {
+    account: `0x${string}`;
+    contractAddress: `0x${string}`;
+    tokenAddress: `0x${string}`;
+    required: bigint;
+    chain: Chain;
+  },
+  providerId?: WalletProviderId
+): Promise<Hash> {
+  const data = encodePurchaseRecovery(params.tokenAddress);
+  const miniPay = isMiniPayPayment(providerId);
+  const attempts = miniPay ? 6 : 1;
+  const retryMs = miniPay ? 4000 : 0;
+  let lastError: unknown = new Error("WALLET_TX_FAILED");
+
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    if (attempt > 0) {
+      await new Promise((r) => setTimeout(r, retryMs));
+    }
+
+    const allowance = await readTokenAllowance(
+      providerClient,
+      chainClient,
+      params.tokenAddress,
+      params.account,
+      params.contractAddress
+    );
+    if (allowance < params.required) {
+      lastError = new Error("APPROVE_PENDING");
+      continue;
+    }
+
+    try {
+      const hash = await sendWalletTransaction(
+        walletClient,
+        provider,
+        {
+          chain: params.chain,
+          account: params.account,
+          to: params.contractAddress,
+          data,
+        },
+        providerId
+      );
+
+      const receiptStatus = await waitForReceiptSoft(
+        providerClient,
+        hash,
+        providerId
+      );
+      if (receiptStatus === "reverted") {
+        lastError = new Error("TX_FAILED");
+        continue;
+      }
+
+      return hash;
+    } catch (err) {
+      lastError = err;
+      const normalized = normalizeWalletTxError(err);
+      if (normalized.message === "USER_REJECTED") throw normalized;
+    }
+  }
+
+  throw normalizeWalletTxError(lastError);
+}
+
 export async function sendRecoveryPayment(
   token: RecoveryTokenId,
   providerId?: WalletProviderId,
@@ -313,23 +407,24 @@ export async function sendRecoveryPayment(
     providerId
   );
 
-  const data = encodePurchaseRecovery(prepared.tokenAddress);
   const chain = getActiveChain();
-  const publicClient = resolveReadClient(provider, providerId);
-  const hash = await sendWalletTransaction(
+  const providerClient = resolveReadClient(provider, providerId);
+  const chainClient = createChainPublicClient();
+
+  const hash = await sendPurchaseWithRetries(
     walletClient,
+    provider,
+    providerClient,
+    chainClient,
     {
-      chain,
       account,
-      to: prepared.contractAddress,
-      data,
-      feeCurrency: miniPayPay ? prepared.tokenAddress : undefined,
+      contractAddress: prepared.contractAddress,
+      tokenAddress: prepared.tokenAddress,
+      required,
+      chain,
     },
     providerId
   );
-
-  const receiptStatus = await waitForReceiptSoft(publicClient, hash, providerId);
-  if (receiptStatus === "reverted") throw new Error("TX_FAILED");
 
   return { hash, token: prepared.token };
 }
