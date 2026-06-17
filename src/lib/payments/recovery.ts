@@ -33,15 +33,42 @@ type VerifyResult =
 
 /** Poll delays for receipt + log indexing (MiniPay / mobile RPC can lag). */
 const RECEIPT_POLL_MS = [
-  0, 2000, 3000, 4000, 6000, 8000, 10000, 12000, 15000, 18000, 22000, 26000,
-  30000, 35000, 40000, 45000,
+  0, 400, 800, 1200, 2000, 3000, 4000, 5000, 6000, 8000, 10000,
 ];
+
+function pollSchedule(maxWaitMs?: number): number[] {
+  if (!maxWaitMs || maxWaitMs <= 0) return RECEIPT_POLL_MS;
+  const delays = [0];
+  let total = 0;
+  let step = 400;
+  while (total < maxWaitMs) {
+    delays.push(step);
+    total += step;
+    step = Math.min(step + 300, 2000);
+  }
+  return delays;
+}
+
+async function resolveMinRecoveryPrice(
+  tokenId: RecoveryTokenId,
+  verifyTokenAddresses: `0x${string}`[]
+): Promise<bigint> {
+  let min = await getRecoveryPriceAtomicAsync(tokenId);
+  for (const addr of verifyTokenAddresses) {
+    const onChain = await readRecoveryPriceForToken(addr);
+    if (onChain && onChain > BigInt(0) && onChain < min) {
+      min = onChain;
+    }
+  }
+  return min;
+}
 
 /** Verify RecoveryPurchased event and extract payment details. */
 export async function verifyRecoveryPayment(
   txHash: Hash,
   fromWallet: string,
-  token: string
+  token: string,
+  options?: { maxWaitMs?: number }
 ): Promise<VerifyResult> {
   const normalizedHash = normalizeTxHash(txHash);
 
@@ -73,15 +100,12 @@ export async function verifyRecoveryPayment(
   }
 
   const client = createChainPublicClient();
-  const onChainMin = await readRecoveryPriceForToken(tokenAddress);
-  const minPrice =
-    onChainMin && onChainMin > BigInt(0)
-      ? onChainMin
-      : await getRecoveryPriceAtomicAsync(tokenId);
+  const minPrice = await resolveMinRecoveryPrice(tokenId, verifyTokenAddresses);
 
   let lastReason = "TX_NOT_FOUND";
+  const delays = pollSchedule(options?.maxWaitMs);
 
-  for (const delayMs of RECEIPT_POLL_MS) {
+  for (const delayMs of delays) {
     if (delayMs > 0) {
       await new Promise((r) => setTimeout(r, delayMs));
     }
@@ -156,9 +180,15 @@ export async function verifyRecoveryPayment(
 export async function verifyAndRecordRecoveryPayment(
   txHash: Hash,
   fromWallet: string,
-  token: string
+  token: string,
+  options?: { maxWaitMs?: number }
 ): Promise<VerifyResult> {
-  const result = await verifyRecoveryPayment(txHash, fromWallet, token);
+  const result = await verifyRecoveryPayment(
+    txHash,
+    fromWallet,
+    token,
+    options
+  );
   if (!result.ok) return result;
 
   try {

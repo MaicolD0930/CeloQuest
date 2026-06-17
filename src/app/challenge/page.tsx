@@ -34,6 +34,13 @@ import { WalletPicker } from "@/components/WalletPicker";
 import { useIsMiniPay } from "@/hooks/useIsMiniPay";
 import { isCustomSepoliaTcopm } from "@/lib/chain/minipay-tokens";
 import {
+  clearPendingRefill,
+  postRefillUntilConfirmed,
+  readPendingRefill,
+  savePendingRefill,
+  type RefillApiSuccess,
+} from "@/lib/client/pending-refill";
+import {
   sendRecoveryPayment,
   type RecoveryToken,
 } from "@/lib/wallet";
@@ -283,6 +290,45 @@ export default function ChallengePage() {
     if (!awaitingRefill) return;
     void loadRecoveryMeta();
   }, [awaitingRefill]);
+
+  useEffect(() => {
+    if (!awaitingRefill) return;
+    const pending = readPendingRefill();
+    if (!pending) return;
+
+    let cancelled = false;
+    setRefilling(true);
+    void (async () => {
+      const result = await postRefillUntilConfirmed(pending.txHash, pending.token, {
+        maxAttempts: miniPay ? 24 : 12,
+        retryDelayMs: 3000,
+      });
+      if (cancelled) return;
+      if (result.ok) {
+        applyRefillSuccess(result.data);
+        await syncProgress();
+      }
+      setRefilling(false);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- resume once when refill screen opens
+  }, [awaitingRefill, miniPay]);
+
+  function applyRefillSuccess(data: RefillApiSuccess) {
+    setLivesLeft(data.livesLeft);
+    setAwaitingRefill(false);
+    setCanRefill(false);
+    if (data.startedAt) setStartedAt(data.startedAt);
+    if (typeof data.activeDurationMs === "number") {
+      setDurationOffset(data.activeDurationMs);
+    }
+    setFeedback(null);
+    setSelected(null);
+    clearPendingRefill();
+  }
 
   useEffect(() => {
     setLoading(true);
@@ -549,57 +595,19 @@ export default function ChallengePage() {
         payerWallet ?? undefined
       );
 
-      type RefillResponse = {
-        livesLeft: number;
-        startedAt?: string;
-        activeDurationMs?: number;
-      };
+      savePendingRefill({ txHash, token: paidToken });
 
-      let refillData: RefillResponse | null = null;
-      let refillApiError: string | undefined;
-      const refillAttempts = miniPay ? 16 : 8;
-      const retryDelayMs = miniPay ? 4000 : 3000;
-      const retryableRefillErrors = new Set(["TX_NOT_FOUND", "INVALID_PAYMENT"]);
+      const result = await postRefillUntilConfirmed(txHash, paidToken, {
+        maxAttempts: miniPay ? 24 : 12,
+        retryDelayMs: miniPay ? 3000 : 2500,
+      });
 
-      for (let attempt = 0; attempt < refillAttempts; attempt++) {
-        if (attempt > 0) {
-          await new Promise((r) => setTimeout(r, retryDelayMs));
-        }
-        const res = await fetch("/api/challenge/refill", {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ txHash, token: paidToken }),
-        });
-        if (res.ok) {
-          refillData = (await res.json()) as RefillResponse;
-          break;
-        }
-        try {
-          const body = await res.json();
-          refillApiError = typeof body.error === "string" ? body.error : undefined;
-        } catch {
-          refillApiError = undefined;
-        }
-        if (!refillApiError || !retryableRefillErrors.has(refillApiError)) {
-          break;
-        }
-      }
-
-      if (!refillData) {
-        setRefillError(formatRefillError(null, refillApiError));
+      if (!result.ok) {
+        setRefillError(formatRefillError(null, result.error));
         return;
       }
-      const data = refillData;
-      setLivesLeft(data.livesLeft);
-      setAwaitingRefill(false);
-      setCanRefill(false);
-      if (data.startedAt) setStartedAt(data.startedAt);
-      if (typeof data.activeDurationMs === "number") {
-        setDurationOffset(data.activeDurationMs);
-      }
-      setFeedback(null);
-      setSelected(null);
+
+      applyRefillSuccess(result.data);
       await syncProgress();
     } catch (err) {
       setRefillError(formatRefillError(err));

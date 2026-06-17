@@ -1,5 +1,6 @@
 import { formatUnits, type Hash } from "viem";
 import { prisma } from "@/lib/prisma";
+import { MINIPAY_SEPOLIA, MINIPAY_MAINNET } from "@/lib/chain/minipay-tokens";
 import {
   getCopmTokenConfig,
   getUsdcTokenConfig,
@@ -18,8 +19,13 @@ export function symbolForTokenAddress(tokenAddress: string): string {
   const normalized = tokenAddress.toLowerCase();
   const tcopm = getCopmTokenConfig().address?.toLowerCase();
   const usdc = getUsdcTokenConfig().address?.toLowerCase();
+  const minipayUsdc = [
+    MINIPAY_SEPOLIA.USDC,
+    MINIPAY_MAINNET.USDC,
+  ].map((a) => a.toLowerCase());
   if (tcopm && normalized === tcopm) return getCopmTokenConfig().symbol;
   if (usdc && normalized === usdc) return "USDC";
+  if (minipayUsdc.includes(normalized)) return "USDC";
   return "TOKEN";
 }
 

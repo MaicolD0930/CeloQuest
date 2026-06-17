@@ -450,13 +450,7 @@ export async function sendRecoveryPayment(
       prepared,
       providerId
     );
-    const providerClient = resolveReadClient(provider, providerId);
-    const receiptStatus = await waitForReceiptSoft(
-      providerClient,
-      hash,
-      providerId
-    );
-    if (receiptStatus === "reverted") throw new Error("TX_FAILED");
+    // Do not poll receipt via MiniPay provider — eth_getTransactionReceipt can hang.
     return { hash, token: prepared.token };
   }
 

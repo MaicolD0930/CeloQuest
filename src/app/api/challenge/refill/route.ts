@@ -7,6 +7,24 @@ import { todayKey } from "@/lib/game";
 import { verifyAndRecordRecoveryPayment } from "@/lib/payments/recovery";
 import { normalizeRecoveryTokenParam } from "@/lib/tokens/recovery";
 
+/** Allow receipt polling on server (Vercel Pro; hobby caps at 10s). */
+export const maxDuration = 60;
+
+function refillSuccessResponse(attempt: {
+  livesLeft: number;
+  startedAt: Date | null;
+  durationMs: number | null;
+}) {
+  return NextResponse.json({
+    ok: true,
+    livesLeft: attempt.livesLeft,
+    startedAt: attempt.startedAt,
+    activeDurationMs: attempt.durationMs ?? 0,
+    timerPaused: false,
+    message: "Life restored. Continue your daily challenge!",
+  });
+}
+
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) {
@@ -33,17 +51,24 @@ export async function POST(req: NextRequest) {
   if (attempt.completedAt) {
     return NextResponse.json({ error: "Challenge already completed" }, { status: 409 });
   }
-  if (attempt.result !== "awaiting_refill") {
-    return NextResponse.json({ error: "Refill not available" }, { status: 400 });
+
+  if (attempt.lifeRefillUsed && attempt.refillTxHash === txHash) {
+    return refillSuccessResponse(attempt);
   }
+
   if (attempt.lifeRefillUsed) {
     return NextResponse.json({ error: "REFILL_ALREADY_USED" }, { status: 409 });
+  }
+
+  if (attempt.result !== "awaiting_refill") {
+    return NextResponse.json({ error: "Refill not available" }, { status: 400 });
   }
 
   const verification = await verifyAndRecordRecoveryPayment(
     txHash as Hash,
     user.walletAddress,
-    token
+    token,
+    { maxWaitMs: 25_000 }
   );
   if (!verification.ok) {
     console.error("refill verification failed", {
@@ -58,7 +83,7 @@ export async function POST(req: NextRequest) {
   const alreadyUsedTx = await prisma.dailyAttempt.findFirst({
     where: { refillTxHash: txHash },
   });
-  if (alreadyUsedTx) {
+  if (alreadyUsedTx && alreadyUsedTx.id !== attempt.id) {
     return NextResponse.json({ error: "TX_ALREADY_USED" }, { status: 409 });
   }
 
@@ -74,12 +99,5 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  return NextResponse.json({
-    ok: true,
-    livesLeft: updated.livesLeft,
-    startedAt: updated.startedAt,
-    activeDurationMs: updated.durationMs ?? 0,
-    timerPaused: false,
-    message: "Life restored. Continue your daily challenge!",
-  });
+  return refillSuccessResponse(updated);
 }
