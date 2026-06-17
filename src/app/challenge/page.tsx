@@ -10,6 +10,7 @@ import {
   Heart,
   HeartCrack,
   Lightbulb,
+  Loader2,
   PartyPopper,
   Sparkles,
   Star,
@@ -82,6 +83,8 @@ type Summary = {
   outOfLives: boolean;
 };
 
+type RefillStep = "idle" | "wallet" | "confirming" | "success";
+
 export default function ChallengePage() {
   const { t, locale } = useLocale();
   const miniPay = useIsMiniPay();
@@ -99,6 +102,8 @@ export default function ChallengePage() {
   const [awaitingRefill, setAwaitingRefill] = useState(false);
   const [canRefill, setCanRefill] = useState(false);
   const [refilling, setRefilling] = useState(false);
+  const [refillStep, setRefillStep] = useState<RefillStep>("idle");
+  const [refillStatus, setRefillStatus] = useState<string | null>(null);
   const [refillError, setRefillError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [introDismissed, setIntroDismissed] = useState(false);
@@ -291,32 +296,6 @@ export default function ChallengePage() {
     void loadRecoveryMeta();
   }, [awaitingRefill]);
 
-  useEffect(() => {
-    if (!awaitingRefill) return;
-    const pending = readPendingRefill();
-    if (!pending) return;
-
-    let cancelled = false;
-    setRefilling(true);
-    void (async () => {
-      const result = await postRefillUntilConfirmed(pending.txHash, pending.token, {
-        maxAttempts: miniPay ? 24 : 12,
-        retryDelayMs: 3000,
-      });
-      if (cancelled) return;
-      if (result.ok) {
-        applyRefillSuccess(result.data);
-        await syncProgress();
-      }
-      setRefilling(false);
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- resume once when refill screen opens
-  }, [awaitingRefill, miniPay]);
-
   function applyRefillSuccess(data: RefillApiSuccess) {
     setLivesLeft(data.livesLeft);
     setAwaitingRefill(false);
@@ -327,8 +306,63 @@ export default function ChallengePage() {
     }
     setFeedback(null);
     setSelected(null);
+    setRefillStep("idle");
+    setRefillStatus(null);
+    setRefillError(null);
     clearPendingRefill();
+    invalidateChallengeCache();
+    invalidateMeCache();
   }
+
+  async function confirmRefillOnServer(
+    txHash: string,
+    token: RecoveryToken
+  ): Promise<boolean> {
+    setRefillStep("confirming");
+    setRefillError(null);
+    setRefillStatus(t.challenge.confirmingPayment);
+
+    const result = await postRefillUntilConfirmed(txHash, token, {
+      maxAttempts: miniPay ? 30 : 20,
+      retryDelayMs: 2000,
+      onProgress: () => {
+        setRefillStatus(t.challenge.confirmingPayment);
+      },
+    });
+
+    if (!result.ok) {
+      setRefillStep("idle");
+      setRefillStatus(null);
+      setRefillError(formatRefillError(null, result.error));
+      return false;
+    }
+
+    setRefillStep("success");
+    setRefillStatus(t.challenge.lifeRestored);
+    await new Promise((r) => setTimeout(r, 1100));
+    applyRefillSuccess(result.data);
+    void syncProgress();
+    return true;
+  }
+
+  useEffect(() => {
+    if (!awaitingRefill || refilling) return;
+    const pending = readPendingRefill();
+    if (!pending) return;
+
+    let cancelled = false;
+    setRefilling(true);
+    void (async () => {
+      const ok = await confirmRefillOnServer(pending.txHash, pending.token);
+      if (!cancelled && !ok) setRefilling(false);
+      else if (!cancelled) setRefilling(false);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- resume pending payment once
+  }, [awaitingRefill]);
 
   useEffect(() => {
     setLoading(true);
@@ -548,6 +582,7 @@ export default function ChallengePage() {
 
   async function handleRefill() {
     setRefillError(null);
+    setRefillStatus(null);
     const walletId: WalletProviderId | null = miniPay ? "minipay" : selectedWallet;
     if (!walletId) {
       setRefillError(t.connect.chooseWalletFirst);
@@ -558,6 +593,8 @@ export default function ChallengePage() {
       return;
     }
     setRefilling(true);
+    setRefillStep("wallet");
+    setRefillStatus(t.challenge.openingWallet);
     try {
       let payerWallet = sessionWallet;
       const balRes = await fetch(
@@ -571,6 +608,8 @@ export default function ChallengePage() {
           setSessionWallet(bal.walletAddress);
         }
         if (!bal.sufficient) {
+          setRefillStep("idle");
+          setRefillStatus(null);
           setRefillError(
             insufficientBalanceMessage(
               selectedToken,
@@ -587,6 +626,8 @@ export default function ChallengePage() {
           typeof bal.tokenAddress === "string" &&
           isCustomSepoliaTcopm(bal.tokenAddress)
         ) {
+          setRefillStep("idle");
+          setRefillStatus(null);
           setRefillError(t.challenge.minipayCustomTcopm);
           return;
         }
@@ -599,20 +640,10 @@ export default function ChallengePage() {
       );
 
       savePendingRefill({ txHash, token: paidToken });
-
-      const result = await postRefillUntilConfirmed(txHash, paidToken, {
-        maxAttempts: miniPay ? 24 : 12,
-        retryDelayMs: miniPay ? 3000 : 2500,
-      });
-
-      if (!result.ok) {
-        setRefillError(formatRefillError(null, result.error));
-        return;
-      }
-
-      applyRefillSuccess(result.data);
-      await syncProgress();
+      await confirmRefillOnServer(txHash, paidToken);
     } catch (err) {
+      setRefillStep("idle");
+      setRefillStatus(null);
       setRefillError(formatRefillError(err));
     } finally {
       setRefilling(false);
@@ -738,10 +769,16 @@ export default function ChallengePage() {
             onSelectToken={setSelectedToken}
             refillError={refillError}
             refilling={refilling}
+            refillStep={refillStep}
+            refillStatus={refillStatus}
             canRefill={canRefill}
             payWithTokenLabel={t.challenge.payWithToken}
             selectTokenLabel={t.challenge.selectPaymentToken}
             processingLabel={t.challenge.processingPayment}
+            confirmingLabel={t.challenge.confirmingPayment}
+            confirmingHint={t.challenge.confirmingPaymentHint}
+            lifeRestoredLabel={t.challenge.lifeRestored}
+            openingWalletLabel={t.challenge.openingWallet}
             waitLabel={t.challenge.waitForReset}
             onRefill={handleRefill}
             onForfeit={handleForfeit}
@@ -1246,10 +1283,16 @@ function RefillScreen({
   onSelectToken,
   refillError,
   refilling,
+  refillStep,
+  refillStatus,
   canRefill,
   selectTokenLabel,
   payWithTokenLabel,
   processingLabel,
+  confirmingLabel,
+  confirmingHint,
+  lifeRestoredLabel,
+  openingWalletLabel,
   waitLabel,
   onRefill,
   onForfeit,
@@ -1277,10 +1320,16 @@ function RefillScreen({
   onSelectToken: (t: RecoveryToken) => void;
   refillError: string | null;
   refilling: boolean;
+  refillStep: RefillStep;
+  refillStatus: string | null;
   canRefill: boolean;
   selectTokenLabel: string;
   payWithTokenLabel: string;
   processingLabel: string;
+  confirmingLabel: string;
+  confirmingHint: string;
+  lifeRestoredLabel: string;
+  openingWalletLabel: string;
   waitLabel: string;
   onRefill: () => void;
   onForfeit: () => void;
@@ -1291,23 +1340,44 @@ function RefillScreen({
   hideWalletPicker?: boolean;
   minipayHint?: string;
 }) {
+  const isConfirming = refillStep === "confirming" || refillStep === "wallet";
+  const isSuccess = refillStep === "success";
+
   return (
     <div className="flex flex-1 flex-col">
       <div className="flex flex-1 flex-col items-center justify-center text-center">
-        <div className="animate-pop mb-6 grid size-24 place-items-center rounded-full bg-danger/15 ring-4 ring-danger/25">
-          <HeartCrack className="size-12 text-danger" />
+        <div
+          className={`animate-pop mb-6 grid size-24 place-items-center rounded-full ring-4 ${
+            isSuccess
+              ? "bg-prosperity/20 ring-prosperity/40"
+              : "bg-danger/15 ring-danger/25"
+          }`}
+        >
+          {isSuccess ? (
+            <CheckCircle2 className="size-12 text-prosperity" />
+          ) : isConfirming ? (
+            <Loader2 className="size-12 animate-spin text-prosperity" />
+          ) : (
+            <HeartCrack className="size-12 text-danger" />
+          )}
         </div>
         <h2 className="animate-card-pop font-display text-2xl font-bold text-h-foreground">
-          {title}
+          {isSuccess ? lifeRestoredLabel : title}
         </h2>
-        <p className="mt-2 font-display text-sm font-bold text-danger">
-          ❤️ {livesLabel}
-        </p>
-        <p className="mt-4 max-w-xs text-sm font-medium text-h-muted">{body}</p>
-        <p className="mt-2 text-xs font-semibold text-h-muted/70">
-          {earnedLabel}
-        </p>
-        {timerPaused && (
+        {!isSuccess && (
+          <p className="mt-2 font-display text-sm font-bold text-danger">
+            ❤️ {livesLabel}
+          </p>
+        )}
+        {!isSuccess && (
+          <p className="mt-4 max-w-xs text-sm font-medium text-h-muted">{body}</p>
+        )}
+        {!isSuccess && (
+          <p className="mt-2 text-xs font-semibold text-h-muted/70">
+            {earnedLabel}
+          </p>
+        )}
+        {timerPaused && !isSuccess && (
           <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-surface px-3 py-1.5 text-xs font-semibold text-h-muted ring-1 ring-h-border">
             <Clock className="size-3.5 text-h-muted" />⏸ {timeLabel}:{" "}
             <span className="font-mono text-prosperity">
@@ -1318,6 +1388,30 @@ function RefillScreen({
       </div>
 
       <div className="flex flex-col gap-3 animate-card-pop">
+        {isConfirming || isSuccess ? (
+          <div className="rounded-2xl bg-surface p-6 ring-1 ring-prosperity/30 card-depth-sm text-center">
+            <p className="text-sm font-bold text-prosperity">
+              {isSuccess
+                ? lifeRestoredLabel
+                : refillStep === "wallet"
+                  ? openingWalletLabel
+                  : confirmingLabel}
+            </p>
+            {!isSuccess && (
+              <p className="mt-2 text-xs font-medium leading-relaxed text-h-muted">
+                {confirmingHint}
+              </p>
+            )}
+            {refillStatus && (
+              <p className="mt-3 inline-flex items-center justify-center gap-2 text-xs font-semibold text-h-foreground">
+                {!isSuccess && (
+                  <Loader2 className="size-3.5 animate-spin text-prosperity" />
+                )}
+                {refillStatus}
+              </p>
+            )}
+          </div>
+        ) : (
         <div className="rounded-2xl bg-surface p-5 ring-1 ring-prosperity/30 card-depth-sm">
           <p className="text-center text-sm font-bold text-prosperity">
             ⚡ {recoverLabel}
@@ -1357,7 +1451,7 @@ function RefillScreen({
             </div>
           )}
 
-          {refillError && (
+          {refillError && !isConfirming && !isSuccess && (
             <p className="animate-shake mt-2 text-center text-xs font-bold text-danger">
               {refillError}
             </p>
@@ -1386,11 +1480,12 @@ function RefillScreen({
               : `💰 ${payWithTokenLabel.replace("{token}", selectedToken)}`}
           </button>
         </div>
+        )}
 
         <button
           type="button"
           onClick={onForfeit}
-          disabled={submitting}
+          disabled={submitting || refilling}
           className="rounded-2xl bg-surface py-4 font-display text-sm font-semibold text-h-muted ring-1 ring-h-border transition-transform active:scale-[0.98] disabled:opacity-50"
         >
           ⏳ {waitLabel}

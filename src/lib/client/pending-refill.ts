@@ -54,18 +54,30 @@ export type RefillApiSuccess = {
 };
 
 /** POST /api/challenge/refill with timeout; retries until receipt is indexed. */
+export type RefillProgress = {
+  attempt: number;
+  maxAttempts: number;
+};
+
 export async function postRefillUntilConfirmed(
   txHash: string,
   token: RecoveryTokenId,
-  options?: { maxAttempts?: number; retryDelayMs?: number; fetchTimeoutMs?: number }
+  options?: {
+    maxAttempts?: number;
+    retryDelayMs?: number;
+    fetchTimeoutMs?: number;
+    onProgress?: (progress: RefillProgress) => void;
+  }
 ): Promise<{ ok: true; data: RefillApiSuccess } | { ok: false; error?: string }> {
-  const maxAttempts = options?.maxAttempts ?? 24;
-  const retryDelayMs = options?.retryDelayMs ?? 2500;
+  const maxAttempts = options?.maxAttempts ?? 30;
+  const retryDelayMs = options?.retryDelayMs ?? 2000;
   const fetchTimeoutMs = options?.fetchTimeoutMs ?? 12_000;
 
   let lastError: string | undefined;
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    options?.onProgress?.({ attempt: attempt + 1, maxAttempts });
+
     if (attempt > 0) {
       await new Promise((r) => setTimeout(r, retryDelayMs));
     }
@@ -95,6 +107,8 @@ export async function postRefillUntilConfirmed(
       }
 
       if (lastError === "REFILL_ALREADY_USED") {
+        const recovered = await tryRecoverRefillStateFromServer();
+        if (recovered) return { ok: true, data: recovered };
         return { ok: false, error: lastError };
       }
 
@@ -133,4 +147,30 @@ function shouldRetryRefill(error: string | undefined, status: number): boolean {
   if (error.startsWith("HTTP_5")) return true;
   if (status >= 500) return true;
   return false;
+}
+
+/** If refill already applied server-side, sync client state without another payment. */
+async function tryRecoverRefillStateFromServer(): Promise<RefillApiSuccess | null> {
+  try {
+    const res = await fetch("/api/challenge/today", { credentials: "include" });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const progress = data?.progress;
+    if (
+      progress &&
+      !progress.awaitingRefill &&
+      typeof progress.livesLeft === "number" &&
+      progress.livesLeft > 0
+    ) {
+      clearPendingRefill();
+      return {
+        livesLeft: progress.livesLeft,
+        startedAt: progress.startedAt,
+        activeDurationMs: progress.activeDurationMs,
+      };
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
 }

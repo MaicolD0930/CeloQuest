@@ -354,6 +354,11 @@ const es = {
     insufficientBalance: "Saldo insuficiente. Necesitas al menos {amount}.",
     yourBalance: "Tu saldo",
     processingPayment: "Procesando pago...",
+    openingWallet: "Confirma el pago en tu wallet",
+    confirmingPayment: "Confirmando tu pago en la red…",
+    confirmingPaymentHint:
+      "No cierres la app ni cambies de pantalla. Tu vida se restaurará sola en unos segundos.",
+    lifeRestored: "¡Vida recuperada! Sigue con el reto…",
     waitForReset: "Esperar al próximo reinicio (UTC)",
     seeOptions: "Ver opciones",
     refillError: "No se pudo verificar el pago. Intenta de nuevo.",
@@ -816,6 +821,11 @@ const en: Dict = {
     insufficientBalance: "Insufficient balance. You need at least {amount}.",
     yourBalance: "Your balance",
     processingPayment: "Processing payment...",
+    openingWallet: "Confirm the payment in your wallet",
+    confirmingPayment: "Confirming your payment on-chain…",
+    confirmingPaymentHint:
+      "Do not close the app or switch screens. Your life will restore automatically in a few seconds.",
+    lifeRestored: "Life restored! Continue the challenge…",
     waitForReset: "Wait for next reset (UTC)",
     seeOptions: "See options",
     refillError: "Could not verify payment. Try again.",
