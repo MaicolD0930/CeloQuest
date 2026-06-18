@@ -98,7 +98,7 @@ export function getRecoveryPriceAtomic(
 
   if (network === "mainnet" && token === "cCOPM") {
     const fixed = BigInt(getRecoveryCcopmFixed());
-    return fixed * 10n ** BigInt(getCopmTokenConfig().decimals);
+    return fixed * BigInt(10) ** BigInt(getCopmTokenConfig().decimals);
   }
 
   const rate = copPerUsd ?? getCopPerUsd();
