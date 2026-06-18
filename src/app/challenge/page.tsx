@@ -33,7 +33,7 @@ import {
 } from "@/lib/client/challenge-cache";
 import { WalletPicker } from "@/components/WalletPicker";
 import { useIsMiniPay } from "@/hooks/useIsMiniPay";
-import { isCustomSepoliaTcopm } from "@/lib/chain/minipay-tokens";
+import { isCustomSepoliaTcopm, filterRecoveryTokensForMiniPay } from "@/lib/chain/minipay-tokens";
 import {
   clearPendingRefill,
   postRefillUntilConfirmed,
@@ -109,8 +109,8 @@ export default function ChallengePage() {
   const [introDismissed, setIntroDismissed] = useState(false);
   const [startedAt, setStartedAt] = useState<string | null>(null);
   const [durationOffset, setDurationOffset] = useState(0);
-  const [recoveryTokens, setRecoveryTokens] = useState<RecoveryToken[]>(["tCOPM"]);
-  const [selectedToken, setSelectedToken] = useState<RecoveryToken>("tCOPM");
+  const [recoveryTokens, setRecoveryTokens] = useState<RecoveryToken[]>(["USDC"]);
+  const [selectedToken, setSelectedToken] = useState<RecoveryToken>("USDC");
   const [tokenBalance, setTokenBalance] = useState<string | null>(null);
   const [sessionWallet, setSessionWallet] = useState<string | null>(null);
   const [selectedWallet, setSelectedWallet] = useState<WalletProviderId | null>(null);
@@ -122,6 +122,8 @@ export default function ChallengePage() {
     if (miniPay) {
       setSelectedWallet("minipay");
       savePreferredWalletProvider("minipay");
+      setSelectedToken("USDC");
+      setRecoveryTokens(["USDC"]);
       return;
     }
     setSelectedWallet(getPreferredWalletProvider());
@@ -228,13 +230,21 @@ export default function ChallengePage() {
       const data = await res.json();
       const apiTokens = data.tokens;
       if (Array.isArray(apiTokens) && apiTokens.length > 0) {
-        const ids = apiTokens
+        const filteredTokens = miniPay
+          ? filterRecoveryTokensForMiniPay(
+              apiTokens.filter(
+                (t): t is { id: RecoveryToken; priceDisplay?: string } =>
+                  typeof t === "object" && t?.id != null
+              )
+            )
+          : apiTokens;
+        const ids = filteredTokens
           .map((t: { id?: string; priceDisplay?: string } | string) =>
             typeof t === "string" ? t : t.id
           )
           .filter(Boolean) as RecoveryToken[];
         const labels: Record<string, string> = {};
-        for (const t of apiTokens) {
+        for (const t of filteredTokens) {
           if (typeof t === "object" && t?.id && t?.priceDisplay) {
             labels[t.id] = t.priceDisplay;
           }
@@ -242,13 +252,9 @@ export default function ChallengePage() {
         if (Object.keys(labels).length > 0) setTokenPriceLabels(labels);
         if (ids.length > 0) {
           setRecoveryTokens(ids);
-          let preferred = ids[0];
+          let preferred: RecoveryToken = miniPay ? "USDC" : ids[0];
           const tokenOrder = miniPay
-            ? [...ids].sort((a, b) => {
-                if (a === "USDC") return -1;
-                if (b === "USDC") return 1;
-                return 0;
-              })
+            ? (["USDC"] as RecoveryToken[])
             : ids;
           for (const id of tokenOrder) {
             try {
@@ -263,7 +269,7 @@ export default function ChallengePage() {
               }
               if (!bal.sufficient) continue;
               if (
-                miniPay &&
+                !miniPay &&
                 id === "tCOPM" &&
                 typeof bal.tokenAddress === "string" &&
                 isCustomSepoliaTcopm(bal.tokenAddress)
@@ -610,13 +616,14 @@ export default function ChallengePage() {
       setRefillError(t.connect.walletNotInstalled);
       return;
     }
+    const payToken: RecoveryToken = miniPay ? "USDC" : selectedToken;
     setRefilling(true);
     setRefillStep("wallet");
     setRefillStatus(t.challenge.openingWallet);
     try {
       let payerWallet = sessionWallet;
       const balRes = await fetch(
-        `/api/wallet/recovery-balance?token=${encodeURIComponent(selectedToken)}`,
+        `/api/wallet/recovery-balance?token=${encodeURIComponent(payToken)}`,
         { credentials: "include" }
       );
       if (balRes.ok) {
@@ -630,7 +637,7 @@ export default function ChallengePage() {
           setRefillStatus(null);
           setRefillError(
             insufficientBalanceMessage(
-              selectedToken,
+              payToken,
               typeof bal.requiredDisplay === "string"
                 ? bal.requiredDisplay
                 : undefined
@@ -639,8 +646,8 @@ export default function ChallengePage() {
           return;
         }
         if (
-          miniPay &&
-          selectedToken === "tCOPM" &&
+          !miniPay &&
+          payToken === "tCOPM" &&
           typeof bal.tokenAddress === "string" &&
           isCustomSepoliaTcopm(bal.tokenAddress)
         ) {
@@ -652,7 +659,7 @@ export default function ChallengePage() {
       }
 
       const { hash: txHash, token: paidToken } = await sendRecoveryPayment(
-        selectedToken,
+        payToken,
         walletId,
         payerWallet ?? undefined
       );
@@ -812,12 +819,9 @@ export default function ChallengePage() {
               install: t.connect.installWallet,
             }}
             hideWalletPicker={miniPay}
+            hideTokenPicker={miniPay}
             minipayHint={
-              miniPay
-                ? selectedToken === "tCOPM"
-                  ? t.challenge.minipayCustomTcopmHint
-                  : t.challenge.minipayAmountHint
-                : undefined
+              miniPay ? t.challenge.minipayAmountHint : undefined
             }
           />
         </main>
@@ -1325,6 +1329,7 @@ function RefillScreen({
   onSelectWallet,
   walletLabels,
   hideWalletPicker = false,
+  hideTokenPicker = false,
   minipayHint,
 }: {
   title: string;
@@ -1365,6 +1370,7 @@ function RefillScreen({
   onSelectWallet: (id: WalletProviderId) => void;
   walletLabels: { chooseWallet: string; notInstalled: string; install: string };
   hideWalletPicker?: boolean;
+  hideTokenPicker?: boolean;
   minipayHint?: string;
 }) {
   const isConfirming = refillStep === "confirming" || refillStep === "wallet";
@@ -1456,7 +1462,7 @@ function RefillScreen({
             </p>
           )}
 
-          {recoveryTokens.length > 0 && (
+          {recoveryTokens.length > 0 && !hideTokenPicker && recoveryTokens.length > 1 && (
             <div className="mt-3">
               <label className="mb-1.5 block text-center text-[10px] font-bold uppercase tracking-wide text-h-muted">
                 {selectTokenLabel}

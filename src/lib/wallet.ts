@@ -372,20 +372,10 @@ async function sendMiniPayDirectTransfer(
   providerId?: WalletProviderId
 ): Promise<Hash> {
   const required = BigInt(prepared.recoveryPrice);
-  const providerClient = resolveReadClient(provider, providerId);
-
-  const sendTokenAddress = resolveMiniPaySendTokenAddress(
+  const tokenAddress = resolveMiniPaySendTokenAddress(
     prepared.token,
     prepared.tokenAddress
   );
-
-  const balance = await providerClient.readContract({
-    address: sendTokenAddress,
-    abi: erc20ExtendedAbi,
-    functionName: "balanceOf",
-    args: [account],
-  });
-  if (balance < required) throw new Error("INSUFFICIENT_BALANCE");
 
   if (isCustomSepoliaTcopm(prepared.tokenAddress)) {
     throw new Error("MINIPAY_CUSTOM_TCOPM");
@@ -401,7 +391,7 @@ async function sendMiniPayDirectTransfer(
 
   return sendMiniPayTransaction(provider, {
     from: account,
-    to: sendTokenAddress,
+    to: tokenAddress,
     data,
     chain: getActiveChain(),
     ...(feeCurrency ? { feeCurrency } : {}),

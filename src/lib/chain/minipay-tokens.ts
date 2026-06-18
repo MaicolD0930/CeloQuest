@@ -32,8 +32,9 @@ export function resolveMiniPaySendTokenAddress(
   tokenId: RecoveryTokenId,
   configured: `0x${string}`
 ): `0x${string}` {
-  if (getCeloNetwork() === "sepolia" && tokenId === "USDC") {
-    return MINIPAY_SEPOLIA.USDC;
+  // Sepolia: use configured USDC — 0x2F25 is mainnet fee-adapter, not an ERC-20 on testnet.
+  if (getCeloNetwork() === "mainnet" && tokenId === "USDC") {
+    return MINIPAY_MAINNET.USDC;
   }
   return configured;
 }
@@ -44,13 +45,17 @@ export function resolveRecoveryVerifyTokenAddresses(
   configured: `0x${string}`
 ): `0x${string}`[] {
   const set = new Set<string>([configured.toLowerCase()]);
-  if (getCeloNetwork() === "sepolia" && tokenId === "USDC") {
-    set.add(MINIPAY_SEPOLIA.USDC.toLowerCase());
-  }
   if (getCeloNetwork() === "mainnet" && tokenId === "USDC") {
     set.add(MINIPAY_MAINNET.USDC.toLowerCase());
   }
   return [...set] as `0x${string}`[];
+}
+
+/** MiniPay only supports official USDC — hide tCOPM / cCOPM in refill UI. */
+export function filterRecoveryTokensForMiniPay<T extends { id: RecoveryTokenId }>(
+  tokens: T[]
+): T[] {
+  return tokens.filter((t) => t.id === "USDC");
 }
 
 /** Tokens MiniPay can actually send on the active network. */
