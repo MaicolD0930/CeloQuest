@@ -4,7 +4,7 @@ import { useState } from "react";
 import { ExternalLink } from "lucide-react";
 
 type Props = {
-  token: "tCOPM" | "USDC";
+  token: "tCOPM" | "cCOPM" | "USDC";
   title: string;
   walletLabel: string;
   amountLabel: string;

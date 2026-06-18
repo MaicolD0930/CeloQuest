@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin/auth";
 import { sendAdminToken } from "@/lib/admin/send-token";
 import { getTxExplorerUrl } from "@/lib/chain/config";
+import { normalizeRecoveryTokenParam } from "@/lib/tokens/recovery";
 
 export async function POST(req: NextRequest) {
   const auth = await requireAdmin();
@@ -42,12 +43,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "MISSING_FIELDS" }, { status: 400 });
   }
 
-  if (token !== "tCOPM" && token !== "USDC" && token !== "cCOPM") {
+  const normalized = normalizeRecoveryTokenParam(token);
+  if (normalized !== "USDC" && normalized !== "tCOPM" && normalized !== "cCOPM") {
     return NextResponse.json({ error: "INVALID_TOKEN" }, { status: 400 });
   }
 
   try {
-    const result = await sendAdminToken({ token, to, amount });
+    const result = await sendAdminToken({ token: normalized, to, amount });
     return NextResponse.json({
       ok: true,
       txHash: result.txHash,

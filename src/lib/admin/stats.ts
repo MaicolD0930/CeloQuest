@@ -31,17 +31,20 @@ function buildEconomyFromLogs(
     };
     transactionHash: `0x${string}`;
   }>,
-  tcopm: `0x${string}` | null,
-  usdc: `0x${string}` | null
+  copm: { address: `0x${string}` | null; symbol: string; decimals: number },
+  usdc: { address: `0x${string}` | null; decimals: number }
 ) {
-  let tcopmAtomic = BigInt(0);
+  let copmAtomic = BigInt(0);
   let usdcAtomic = BigInt(0);
 
   for (const log of logs) {
     const token = log.args.token?.toLowerCase() ?? "";
     const amount = log.args.amount ?? BigInt(0);
-    if (tcopm && token === tcopm.toLowerCase()) tcopmAtomic += amount;
-    else if (usdc && token === usdc.toLowerCase()) usdcAtomic += amount;
+    if (copm.address && token === copm.address.toLowerCase()) {
+      copmAtomic += amount;
+    } else if (usdc.address && token === usdc.address.toLowerCase()) {
+      usdcAtomic += amount;
+    }
   }
 
   const onChainPayments = [...logs]
@@ -50,16 +53,24 @@ function buildEconomyFromLogs(
     .map((log) => {
       const token = log.args.token?.toLowerCase() ?? "";
       const amount = log.args.amount ?? BigInt(0);
+      const copmMatch =
+        copm.address && token === copm.address.toLowerCase();
+      const usdcMatch =
+        usdc.address && token === usdc.address.toLowerCase();
+      const decimals = copmMatch
+        ? copm.decimals
+        : usdcMatch
+          ? usdc.decimals
+          : 6;
       return {
         txHash: log.transactionHash,
-        tokenSymbol:
-          tcopm && token === tcopm.toLowerCase()
-            ? "tCOPM"
-            : usdc && token === usdc.toLowerCase()
-              ? "USDC"
-              : symbolForTokenAddress(log.args.token ?? ""),
+        tokenSymbol: copmMatch
+          ? copm.symbol
+          : usdcMatch
+            ? "USDC"
+            : symbolForTokenAddress(log.args.token ?? ""),
         tokenAddress: log.args.token ?? "",
-        amount: formatUnits(amount, 6),
+        amount: formatUnits(amount, decimals),
         userWallet: log.args.user ?? "",
         createdAt: new Date(
           Number(log.args.timestamp ?? BigInt(0)) * 1000
@@ -70,22 +81,24 @@ function buildEconomyFromLogs(
 
   return {
     paymentCount: logs.length,
-    totalTcopm: formatUnits(tcopmAtomic, 6),
-    totalUsdc: formatUnits(usdcAtomic, 6),
+    totalCopm: formatUnits(copmAtomic, copm.decimals),
+    totalUsdc: formatUnits(usdcAtomic, usdc.decimals),
+    copmSymbol: copm.symbol,
     onChainPayments,
   };
 }
 
 async function fetchRecoveryEconomyStats() {
   const contract = getRecoveryContractAddress();
-  const tcopm = getCopmTokenConfig().address;
-  const usdc = getUsdcTokenConfig().address;
+  const copm = getCopmTokenConfig();
+  const usdc = getUsdcTokenConfig();
 
   if (!contract) {
     return {
       paymentCount: 0,
-      totalTcopm: "0",
+      totalCopm: "0",
       totalUsdc: "0",
+      copmSymbol: copm.symbol,
       onChainPayments: [] as Array<{
         txHash: string;
         tokenSymbol: string;
@@ -108,13 +121,14 @@ async function fetchRecoveryEconomyStats() {
       toBlock: "latest",
     });
 
-    return buildEconomyFromLogs(logs, tcopm, usdc);
+    return buildEconomyFromLogs(logs, copm, usdc);
   } catch (error) {
     console.error("fetchRecoveryEconomyStats error:", error);
     return {
       paymentCount: 0,
-      totalTcopm: "0",
+      totalCopm: "0",
       totalUsdc: "0",
+      copmSymbol: copm.symbol,
       onChainPayments: [],
     };
   }
@@ -289,8 +303,9 @@ export async function getAdminStats() {
         : null,
     },
     {
-      key: "tcopmToken" as const,
+      key: "copmToken" as const,
       address: tcopmConfig.address,
+      symbol: tcopmConfig.symbol,
       explorerUrl: tcopmConfig.address
         ? getAddressExplorerUrl(tcopmConfig.address)
         : null,
@@ -298,6 +313,7 @@ export async function getAdminStats() {
     {
       key: "usdcToken" as const,
       address: usdcConfig.address,
+      symbol: usdcConfig.symbol,
       explorerUrl: usdcConfig.address
         ? getAddressExplorerUrl(usdcConfig.address)
         : null,
@@ -318,9 +334,15 @@ export async function getAdminStats() {
     },
     economy: {
       paymentCount: economy.paymentCount,
-      totalTcopm: economy.totalTcopm,
+      totalCopm: economy.totalCopm,
       totalUsdc: economy.totalUsdc,
+      copmSymbol: economy.copmSymbol,
       recentPayments,
+    },
+    tokens: {
+      copmId: tcopmConfig.id,
+      copmSymbol: tcopmConfig.symbol,
+      usdcSymbol: usdcConfig.symbol,
     },
     contract: {
       network: getCeloNetwork(),

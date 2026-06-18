@@ -13,6 +13,7 @@ import { AdminContractPanel } from "@/components/admin/AdminContractPanel";
 import { AdminRecentPayments } from "@/components/admin/AdminRecentPayments";
 import { AdminRewardsPanel } from "@/components/admin/AdminRewardsPanel";
 import { AdminFutureSection } from "@/components/admin/AdminFutureSection";
+import type { RecoveryTokenId } from "@/lib/tokens/recovery";
 
 type AdminStats = {
   users: {
@@ -23,8 +24,9 @@ type AdminStats = {
   };
   economy: {
     paymentCount: number;
-    totalTcopm: string;
+    totalCopm: string;
     totalUsdc: string;
+    copmSymbol: string;
     recentPayments: Array<{
       txHash: string;
       tokenSymbol: string;
@@ -35,11 +37,17 @@ type AdminStats = {
       explorerTxUrl: string;
     }>;
   };
+  tokens: {
+    copmId: RecoveryTokenId;
+    copmSymbol: string;
+    usdcSymbol: string;
+  };
   contract: {
     network: string;
     addresses: Array<{
-      key: "recoveryContract" | "rewardsContract" | "tcopmToken" | "usdcToken" | "treasury";
+      key: "recoveryContract" | "rewardsContract" | "copmToken" | "usdcToken" | "treasury";
       address: string | null;
+      symbol?: string;
       explorerUrl: string | null;
     }>;
     recentTxHashes: string[];
@@ -64,7 +72,7 @@ export default function AdminPage() {
   const contractLabelByKey = {
     recoveryContract: t.admin.recoveryContract,
     rewardsContract: t.admin.rewardsContract,
-    tcopmToken: `${t.admin.tcopmToken} Token`,
+    copmToken: (symbol: string) => `${symbol} Token`,
     usdcToken: `${t.admin.usdcToken} Token`,
     treasury: t.admin.treasury,
   };
@@ -201,11 +209,11 @@ export default function AdminPage() {
               icon="💳"
             />
             <AdminStatCard
-              label={t.admin.totalTcopm}
-              value={Number(stats.economy.totalTcopm).toLocaleString(undefined, {
-                maximumFractionDigits: 2,
+              label={stats.economy.copmSymbol}
+              value={Number(stats.economy.totalCopm).toLocaleString(undefined, {
+                maximumFractionDigits: 4,
               })}
-              hint={t.admin.totalTcopmHint}
+              hint={t.admin.totalCopmHint}
               icon="🇨🇴"
             />
             <AdminStatCard
@@ -267,8 +275,11 @@ export default function AdminPage() {
           </h2>
           <div className="grid grid-cols-1 gap-3">
             <AdminTokenSendForm
-              token="tCOPM"
-              title={t.admin.sendTcopm}
+              token={stats.tokens.copmId}
+              title={t.admin.sendCopm.replace(
+                "{symbol}",
+                stats.tokens.copmSymbol
+              )}
               walletLabel={t.admin.recipientWallet}
               amountLabel={t.admin.amount}
               sendLabel={t.admin.send}
@@ -295,7 +306,12 @@ export default function AdminPage() {
           title={t.admin.contractSection}
           network={stats.contract.network}
           addresses={stats.contract.addresses.map((entry) => ({
-            label: contractLabelByKey[entry.key],
+            label:
+              entry.key === "copmToken"
+                ? contractLabelByKey.copmToken(
+                    entry.symbol ?? stats.tokens.copmSymbol
+                  )
+                : contractLabelByKey[entry.key],
             address: entry.address,
             explorerUrl: entry.explorerUrl,
           }))}
