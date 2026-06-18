@@ -68,7 +68,6 @@ function classifyHttpFailure(
     return "API_DOWN";
   }
   if (status >= 500) {
-    if (errorCode === "SERVER_ERROR") return "DATABASE";
     return "API_DOWN";
   }
   return "HTTP_ERROR";

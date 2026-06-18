@@ -210,14 +210,20 @@ export default function ChallengePage() {
   ) {
     setDurationOffset(repairInflatedDurationMs(ms, result, answerCount, completed));
   }
-  async function loadChallenge(force = false) {
-    setLoadError(null);
+  async function loadChallenge(force = false, options?: { softFail?: boolean }) {
+    if (!options?.softFail) {
+      setLoadError(null);
+    }
     try {
       const data = await fetchChallengeToday(locale, { force });
       await applyChallengeData(data);
     } catch (e) {
       if (isApiClientError(e) && e.kind === "UNAUTHORIZED") {
         window.location.assign("/connect");
+        return;
+      }
+      if (options?.softFail) {
+        console.warn("[CeloQuest] loadChallenge soft-fail:", e);
         return;
       }
       setLoadError(
@@ -515,7 +521,7 @@ export default function ChallengePage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        if (res.status === 409) await syncProgress();
+        if (res.status === 409) await syncProgress({ soft: true });
         return;
       }
       invalidateChallengeCache();
@@ -553,16 +559,17 @@ export default function ChallengePage() {
     }
   }
 
-  async function syncProgress() {
+  async function syncProgress(options?: { soft?: boolean }) {
     invalidateChallengeCache();
-    await loadChallenge(true);
+    await loadChallenge(true, {
+      softFail: options?.soft ?? questions.length > 0,
+    });
   }
 
   function handleNext() {
     if (awaitingRefill && !summary) {
       setFeedback(null);
       setSelected(null);
-      void syncProgress();
       return;
     }
     setFeedback(null);

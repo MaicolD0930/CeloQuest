@@ -54,8 +54,13 @@ export async function finalizeDailyAttempt(
   const xpGain = attempt.xpEarned;
 
   const freshUser = await prisma.user.findUnique({ where: { id: user.id } });
-  const activeSeason = await ensureActiveSeason();
-  const wKey = activeSeason?.weekKey ?? weekKey();
+  let wKey = weekKey();
+  try {
+    const activeSeason = await ensureActiveSeason();
+    wKey = activeSeason?.weekKey ?? weekKey();
+  } catch (e) {
+    console.error("[finalizeDailyAttempt] ensureActiveSeason failed:", e);
+  }
   const weeklyXpBase =
     freshUser?.currentWeekKey === wKey ? freshUser.weeklyXp : 0;
   const weeklyDurationBase =

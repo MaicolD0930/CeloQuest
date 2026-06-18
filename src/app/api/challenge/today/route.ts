@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/session";
+import { apiServerErrorResponse } from "@/lib/api/server-error";
 import {
   LIVES_PER_DAY,
   todayKey,
@@ -129,6 +130,6 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     console.error("[challenge/today] GET failed:", error);
-    return NextResponse.json({ error: "SERVER_ERROR" }, { status: 500 });
+    return apiServerErrorResponse("[challenge/today] GET", error);
   }
 }
