@@ -118,3 +118,55 @@ export function decodeDirectTransferFromReceipt(
 
   return { ok: false, reason: "INVALID_PAYMENT" };
 }
+
+/**
+ * Scan all receipt logs for ERC-20 transfers to treasury on allowed tokens.
+ * Does not require Transfer.from === payer (MiniPay / smart-wallet safe).
+ */
+export function decodeTreasuryTransferFromReceipt(
+  receipt: TransactionReceipt,
+  params: {
+    txHash: `0x${string}`;
+    allowedTokenAddresses: ReadonlySet<string>;
+    treasuryAddress: `0x${string}`;
+    payerWallet: string;
+    minPrice: bigint;
+    tokenParam: string;
+  }
+): DecodeResult {
+  const treasury = params.treasuryAddress.toLowerCase();
+
+  for (const log of receipt.logs) {
+    const logToken = log.address.toLowerCase();
+    if (!params.allowedTokenAddresses.has(logToken)) continue;
+
+    try {
+      const decoded = decodeEventLog({
+        abi: erc20ExtendedAbi,
+        eventName: "Transfer",
+        data: log.data,
+        topics: log.topics,
+      });
+
+      if (
+        decoded.args.to.toLowerCase() === treasury &&
+        decoded.args.value >= params.minPrice
+      ) {
+        return {
+          ok: true,
+          payment: buildPaymentRecordFromEvent({
+            txHash: params.txHash,
+            userWallet: params.payerWallet,
+            tokenAddress: log.address as `0x${string}`,
+            amountAtomic: decoded.args.value,
+            tokenParam: params.tokenParam,
+          }),
+        };
+      }
+    } catch {
+      // not a Transfer log
+    }
+  }
+
+  return { ok: false, reason: "INVALID_PAYMENT" };
+}

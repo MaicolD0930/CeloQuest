@@ -323,10 +323,14 @@ export default function ChallengePage() {
     setRefillStatus(t.challenge.confirmingPayment);
 
     const result = await postRefillUntilConfirmed(txHash, token, {
-      maxAttempts: miniPay ? 30 : 20,
+      maxWallMs: miniPay ? 90_000 : 60_000,
       retryDelayMs: 2000,
-      onProgress: () => {
-        setRefillStatus(t.challenge.confirmingPayment);
+      onProgress: ({ attempt, maxAttempts }) => {
+        setRefillStatus(
+          t.challenge.confirmingPaymentProgress
+            .replace("{n}", String(attempt))
+            .replace("{max}", String(maxAttempts))
+        );
       },
     });
 
@@ -343,6 +347,18 @@ export default function ChallengePage() {
     applyRefillSuccess(result.data);
     void syncProgress();
     return true;
+  }
+
+  async function handleRetryVerify() {
+    const pending = readPendingRefill();
+    if (!pending) return;
+    setRefilling(true);
+    setRefillError(null);
+    try {
+      await confirmRefillOnServer(pending.txHash, pending.token);
+    } finally {
+      setRefilling(false);
+    }
   }
 
   useEffect(() => {
@@ -504,6 +520,8 @@ export default function ChallengePage() {
     }
     if (apiError === "TX_FAILED") return t.challenge.refillTxFailed;
     if (apiError === "TX_NOT_FOUND") return t.challenge.refillTxNotFound;
+    if (apiError === "VERIFY_TIMEOUT") return t.challenge.refillVerifyTimeout;
+    if (apiError === "WALLET_MISMATCH") return t.challenge.walletMismatch;
     if (apiError === "PAYMENT_NOT_CONFIGURED") {
       return t.challenge.refillPaymentNotConfigured;
     }
@@ -781,6 +799,9 @@ export default function ChallengePage() {
             openingWalletLabel={t.challenge.openingWallet}
             waitLabel={t.challenge.waitForReset}
             onRefill={handleRefill}
+            onRetryVerify={handleRetryVerify}
+            showRetryVerify={!!readPendingRefill() && !!refillError}
+            retryVerifyLabel={t.challenge.retryVerifyPayment}
             onForfeit={handleForfeit}
             submitting={submitting}
             selectedWallet={selectedWallet}
@@ -1295,6 +1316,9 @@ function RefillScreen({
   openingWalletLabel,
   waitLabel,
   onRefill,
+  onRetryVerify,
+  showRetryVerify = false,
+  retryVerifyLabel,
   onForfeit,
   submitting,
   selectedWallet,
@@ -1332,6 +1356,9 @@ function RefillScreen({
   openingWalletLabel: string;
   waitLabel: string;
   onRefill: () => void;
+  onRetryVerify?: () => void;
+  showRetryVerify?: boolean;
+  retryVerifyLabel?: string;
   onForfeit: () => void;
   submitting: boolean;
   selectedWallet: WalletProviderId | null;
@@ -1455,6 +1482,17 @@ function RefillScreen({
             <p className="animate-shake mt-2 text-center text-xs font-bold text-danger">
               {refillError}
             </p>
+          )}
+
+          {showRetryVerify && onRetryVerify && retryVerifyLabel && !isConfirming && !isSuccess && (
+            <button
+              type="button"
+              onClick={onRetryVerify}
+              disabled={refilling}
+              className="btn-chunky mt-3 w-full rounded-2xl bg-lemon/90 py-3 font-display text-sm font-bold text-h-background disabled:opacity-50"
+            >
+              ↻ {retryVerifyLabel}
+            </button>
           )}
 
           <div className="mt-4">

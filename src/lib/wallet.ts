@@ -374,8 +374,13 @@ async function sendMiniPayDirectTransfer(
   const required = BigInt(prepared.recoveryPrice);
   const providerClient = resolveReadClient(provider, providerId);
 
+  const sendTokenAddress = resolveMiniPaySendTokenAddress(
+    prepared.token,
+    prepared.tokenAddress
+  );
+
   const balance = await providerClient.readContract({
-    address: prepared.tokenAddress,
+    address: sendTokenAddress,
     abi: erc20ExtendedAbi,
     functionName: "balanceOf",
     args: [account],
@@ -385,11 +390,6 @@ async function sendMiniPayDirectTransfer(
   if (isCustomSepoliaTcopm(prepared.tokenAddress)) {
     throw new Error("MINIPAY_CUSTOM_TCOPM");
   }
-
-  const sendTokenAddress = resolveMiniPaySendTokenAddress(
-    prepared.token,
-    prepared.tokenAddress
-  );
 
   const data = encodeFunctionData({
     abi: erc20ExtendedAbi,

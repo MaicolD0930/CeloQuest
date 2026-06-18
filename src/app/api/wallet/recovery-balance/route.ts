@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { formatUnits } from "viem";
+import { getCeloNetwork } from "@/lib/chain/config";
+import { resolveMiniPaySendTokenAddress } from "@/lib/chain/minipay-tokens";
 import { getCurrentUser } from "@/lib/session";
 import { erc20ExtendedAbi } from "@/lib/contracts/recovery-payment-abi";
 import {
@@ -37,11 +39,15 @@ export async function GET(req: NextRequest) {
 
   const wallet = user.walletAddress as `0x${string}`;
   const client = getRecoveryPaymentPublicClient();
+  const balanceTokenAddress =
+    getCeloNetwork() === "sepolia" && tokenId === "USDC"
+      ? resolveMiniPaySendTokenAddress("USDC", config.address)
+      : config.address;
 
   try {
     const [raw, allowance, onChainPrice] = await Promise.all([
       client.readContract({
-        address: config.address,
+        address: balanceTokenAddress,
         abi: erc20ExtendedAbi,
         functionName: "balanceOf",
         args: [wallet],
@@ -77,7 +83,7 @@ export async function GET(req: NextRequest) {
       sufficient: raw >= required,
       allowance: allowance.toString(),
       allowanceSufficient: allowance >= required,
-      tokenAddress: config.address,
+      tokenAddress: balanceTokenAddress,
       contractAddress: contract,
       walletAddress: user.walletAddress,
     });

@@ -28,6 +28,20 @@ function refillSuccessResponse(attempt: {
   });
 }
 
+async function applyRefillToAttempt(attemptId: string, txHash: string, token: string) {
+  return prisma.dailyAttempt.update({
+    where: { id: attemptId },
+    data: {
+      livesLeft: 1,
+      lifeRefillUsed: true,
+      result: "in_progress",
+      refillTxHash: txHash,
+      refillToken: token,
+      startedAt: new Date(),
+    },
+  });
+}
+
 export async function POST(req: NextRequest) {
   try {
     const user = await getCurrentUser();
@@ -68,6 +82,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Refill not available" }, { status: 400 });
     }
 
+    const existingPayment = await prisma.payment.findUnique({
+      where: { txHash },
+    });
+    if (
+      existingPayment &&
+      existingPayment.userWallet.toLowerCase() === user.walletAddress.toLowerCase()
+    ) {
+      const updated = await applyRefillToAttempt(attempt.id, txHash, token);
+      return refillSuccessResponse(updated);
+    }
+
     const verification = await verifyAndRecordRecoveryPayment(
       txHash as Hash,
       user.walletAddress,
@@ -91,17 +116,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "TX_ALREADY_USED" }, { status: 409 });
     }
 
-    const updated = await prisma.dailyAttempt.update({
-      where: { id: attempt.id },
-      data: {
-        livesLeft: 1,
-        lifeRefillUsed: true,
-        result: "in_progress",
-        refillTxHash: txHash,
-        refillToken: token,
-        startedAt: new Date(),
-      },
-    });
+    const updated = await applyRefillToAttempt(attempt.id, txHash, token);
 
     return refillSuccessResponse(updated);
   } catch (error) {

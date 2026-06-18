@@ -356,6 +356,7 @@ const es = {
     processingPayment: "Procesando pago...",
     openingWallet: "Confirma el pago en tu wallet",
     confirmingPayment: "Confirmando tu pago en la red…",
+    confirmingPaymentProgress: "Comprobando compra ({n}/{max})…",
     confirmingPaymentHint:
       "No cierres la app ni cambies de pantalla. Tu vida se restaurará sola en unos segundos.",
     lifeRestored: "¡Vida recuperada! Sigue con el reto…",
@@ -379,6 +380,9 @@ const es = {
       "El servidor tardó en confirmar el pago. No pagues otra vez: espera unos segundos o vuelve a Jugar.",
     refillTxFailed: "La transacción falló on-chain",
     refillTxNotFound: "No encontramos la transacción en la red. Espera unos segundos e intenta de nuevo",
+    refillVerifyTimeout:
+      "La red tardó más de lo habitual. Si ya pagaste, usa «Reintentar verificación» sin volver a pagar.",
+    retryVerifyPayment: "Reintentar verificación",
     refillNotConfigured: "Pagos no configurados. Contacta al administrador",
     refillNotAvailable:
       "El reintento ya no está disponible. Recarga la página para ver si tu vida se restauró.",
@@ -823,6 +827,7 @@ const en: Dict = {
     processingPayment: "Processing payment...",
     openingWallet: "Confirm the payment in your wallet",
     confirmingPayment: "Confirming your payment on-chain…",
+    confirmingPaymentProgress: "Verifying purchase ({n}/{max})…",
     confirmingPaymentHint:
       "Do not close the app or switch screens. Your life will restore automatically in a few seconds.",
     lifeRestored: "Life restored! Continue the challenge…",
@@ -846,6 +851,9 @@ const en: Dict = {
       "The server is still confirming your payment. Do not pay again — wait a few seconds or return to Play.",
     refillTxFailed: "The on-chain transaction failed",
     refillTxNotFound: "Transaction not found on-chain yet. Wait a few seconds and try again",
+    refillVerifyTimeout:
+      "The network is slower than usual. If you already paid, use «Retry verification» without paying again.",
+    retryVerifyPayment: "Retry verification",
     refillNotConfigured: "Payments are not configured. Contact the administrator",
     refillNotAvailable:
       "Refill is no longer available. Refresh the page to see if your life was restored.",

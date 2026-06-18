@@ -1,6 +1,6 @@
 import type { Hash } from "viem";
 import { createChainPublicClient, normalizeTxHash } from "@/lib/chain/public-client";
-import { getRecoveryContractAddress, readRecoveryPriceForToken } from "@/lib/contracts/recovery-payment";
+import { getRecoveryContractAddress } from "@/lib/contracts/recovery-payment";
 import { getRecoveryPriceAtomicAsync } from "@/lib/pricing/recovery-price";
 import {
   getRecoveryTreasury,
@@ -14,7 +14,7 @@ import {
   recordRecoveryPayment,
   type RecoveryPaymentRecord,
 } from "@/lib/payments/record-payment";
-import { decodeRecoveryPaymentFromReceipt, decodeDirectTransferFromReceipt } from "@/lib/payments/verify-recovery-receipt";
+import { decodeRecoveryPaymentFromReceipt, decodeDirectTransferFromReceipt, decodeTreasuryTransferFromReceipt } from "@/lib/payments/verify-recovery-receipt";
 import { resolveRecoveryVerifyTokenAddresses } from "@/lib/chain/minipay-tokens";
 import { resolveTreasuryAddress } from "@/lib/payments/prepare-recovery";
 
@@ -53,17 +53,9 @@ function pollSchedule(maxWaitMs?: number): number[] {
 }
 
 async function resolveMinRecoveryPrice(
-  tokenId: RecoveryTokenId,
-  verifyTokenAddresses: `0x${string}`[]
+  tokenId: RecoveryTokenId
 ): Promise<bigint> {
-  let min = await getRecoveryPriceAtomicAsync(tokenId);
-  for (const addr of verifyTokenAddresses) {
-    const onChain = await readRecoveryPriceForToken(addr);
-    if (onChain && onChain > BigInt(0) && onChain < min) {
-      min = onChain;
-    }
-  }
-  return min;
+  return getRecoveryPriceAtomicAsync(tokenId);
 }
 
 /** Verify RecoveryPurchased event and extract payment details. */
@@ -103,7 +95,10 @@ export async function verifyRecoveryPayment(
   }
 
   const client = createChainPublicClient();
-  const minPrice = await resolveMinRecoveryPrice(tokenId, verifyTokenAddresses);
+  const minPrice = await resolveMinRecoveryPrice(tokenId);
+  const allowedTokens = new Set(
+    verifyTokenAddresses.map((a) => a.toLowerCase())
+  );
 
   let lastReason = "TX_NOT_FOUND";
   const delays = pollSchedule(options?.maxWaitMs);
@@ -114,8 +109,14 @@ export async function verifyRecoveryPayment(
     }
 
     let receipt;
+    let payerWallet: `0x${string}` | null = null;
     try {
-      receipt = await client.getTransactionReceipt({ hash: normalizedHash });
+      const [receiptResult, tx] = await Promise.all([
+        client.getTransactionReceipt({ hash: normalizedHash }),
+        client.getTransaction({ hash: normalizedHash }),
+      ]);
+      receipt = receiptResult;
+      payerWallet = tx.from;
     } catch {
       continue;
     }
@@ -124,11 +125,15 @@ export async function verifyRecoveryPayment(
       return { ok: false, reason: "TX_FAILED" };
     }
 
+    if (payerWallet.toLowerCase() !== fromWallet.toLowerCase()) {
+      return { ok: false, reason: "WALLET_MISMATCH" };
+    }
+
     const contractDecoded = decodeRecoveryPaymentFromReceipt(receipt, {
       txHash: normalizedHash,
       contractAddress,
       tokenAddress: verifyTokenAddresses[0],
-      fromWallet,
+      fromWallet: payerWallet,
       minPrice,
       tokenParam: token,
     });
@@ -139,7 +144,7 @@ export async function verifyRecoveryPayment(
           txHash: normalizedHash,
           contractAddress,
           tokenAddress: alt,
-          fromWallet,
+          fromWallet: payerWallet,
           minPrice,
           tokenParam: token,
         });
@@ -154,12 +159,24 @@ export async function verifyRecoveryPayment(
     }
 
     if (treasuryAddress) {
+      const treasuryDecoded = decodeTreasuryTransferFromReceipt(receipt, {
+        txHash: normalizedHash,
+        allowedTokenAddresses: allowedTokens,
+        treasuryAddress,
+        payerWallet,
+        minPrice,
+        tokenParam: token,
+      });
+      if (treasuryDecoded.ok) {
+        return treasuryDecoded;
+      }
+
       for (const verifyAddress of verifyTokenAddresses) {
         const directDecoded = decodeDirectTransferFromReceipt(receipt, {
           txHash: normalizedHash,
           tokenAddress: verifyAddress,
           treasuryAddress,
-          fromWallet,
+          fromWallet: payerWallet,
           minPrice,
           tokenParam: token,
         });
