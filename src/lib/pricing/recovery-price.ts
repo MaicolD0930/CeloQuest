@@ -1,11 +1,15 @@
 import { formatUnits } from "viem";
+import { getCeloNetwork } from "@/lib/chain/config";
 import type { RecoveryTokenId } from "@/lib/tokens/recovery";
+import {
+  getCopmTokenConfig,
+  getRecoveryTokenConfig,
+  getUsdcTokenConfig,
+} from "@/lib/tokens/recovery";
 import { fetchCopPerUsd } from "@/lib/pricing/cop-usd-rate";
 
-const TOKEN_DECIMALS = 6;
-
-/** Scale factor: (usdCents / 100) * 10^6 = usdCents * 10_000 */
-const USD_CENTS_TO_ATOMIC = BigInt(10000);
+/** Scale factor for USDC (6 decimals): (usdCents / 100) * 10^6 */
+const USD_CENTS_TO_USDC_ATOMIC = BigInt(10_000);
 
 function readIntEnv(keys: string[], fallback: number): number {
   for (const key of keys) {
@@ -31,12 +35,24 @@ function readBigIntEnv(keys: string[]): bigint | null {
   return null;
 }
 
-/** Life recovery price in USD cents (default 10 = $0.10). */
+/** Life recovery price in USD cents (default 1 = $0.01 USDC). */
 export function getRecoveryPriceUsdCents(): number {
   return readIntEnv(
     ["RECOVERY_PRICE_USD_CENTS", "NEXT_PUBLIC_RECOVERY_PRICE_USD_CENTS"],
+    1
+  );
+}
+
+/** Fixed cCOP amount for mainnet recovery (default 10 cCOP). */
+export function getRecoveryCcopmFixed(): number {
+  return readIntEnv(
+    ["RECOVERY_CCOPM_FIXED", "NEXT_PUBLIC_RECOVERY_CCOPM_FIXED"],
     10
   );
+}
+
+export function getTokenDecimals(token: RecoveryTokenId): number {
+  return getRecoveryTokenConfig(token)?.decimals ?? 6;
 }
 
 /** Manual COP/USD override from env (fallback when FX API fails). */
@@ -61,25 +77,32 @@ export function getRecoveryPriceUsd(): number {
 /**
  * Atomic token amount for one life recovery.
  *
- * USDC:  $0.10 → 0.10 USDC
- * COPM:  $0.10 × live COP/USD
+ * Mainnet:
+ *   USDC → $0.01 (RECOVERY_PRICE_USD_CENTS=1)
+ *   cCOP → fixed 10 cCOP (18 decimals)
  *
- * Formula (6 decimals):
- *   usdcAtomic = usdCents × 10_000
- *   copAtomic  = usdCents × copPerUsd × 10_000
+ * Sepolia:
+ *   USDC → USD cents formula (6 decimals)
+ *   tCOPM → USD × COP/USD (6 decimals)
  */
 export function getRecoveryPriceAtomic(
   token: RecoveryTokenId,
   copPerUsd?: bigint
 ): bigint {
   const usdCents = BigInt(getRecoveryPriceUsdCents());
+  const network = getCeloNetwork();
 
   if (token === "USDC") {
-    return usdCents * USD_CENTS_TO_ATOMIC;
+    return usdCents * USD_CENTS_TO_USDC_ATOMIC;
+  }
+
+  if (network === "mainnet" && token === "cCOPM") {
+    const fixed = BigInt(getRecoveryCcopmFixed());
+    return fixed * 10n ** BigInt(getCopmTokenConfig().decimals);
   }
 
   const rate = copPerUsd ?? getCopPerUsd();
-  return usdCents * rate * USD_CENTS_TO_ATOMIC;
+  return usdCents * rate * USD_CENTS_TO_USDC_ATOMIC;
 }
 
 export async function getRecoveryPriceAtomicAsync(
@@ -87,6 +110,9 @@ export async function getRecoveryPriceAtomicAsync(
 ): Promise<bigint> {
   if (token === "USDC") {
     return getRecoveryPriceAtomic("USDC");
+  }
+  if (getCeloNetwork() === "mainnet" && token === "cCOPM") {
+    return getRecoveryPriceAtomic("cCOPM");
   }
   const copPerUsd = await getCopPerUsdLive();
   return getRecoveryPriceAtomic(token, copPerUsd);
@@ -96,8 +122,14 @@ export function formatRecoveryPriceFromAtomic(
   token: RecoveryTokenId,
   atomic: bigint
 ): string {
-  const human = formatUnits(atomic, TOKEN_DECIMALS);
-  const label = token === "USDC" ? "USDC" : token;
+  const decimals = getTokenDecimals(token);
+  const human = formatUnits(atomic, decimals);
+  const label =
+    token === "USDC"
+      ? "USDC"
+      : getCeloNetwork() === "mainnet"
+        ? "cCOP"
+        : token;
   return `${human} ${label}`;
 }
 
@@ -118,19 +150,26 @@ export async function formatRecoveryPriceAsync(
 export function getRecoveryPricingMeta(copPerUsd: bigint, rateSource?: string) {
   const usdCents = getRecoveryPriceUsdCents();
   const usd = usdCents / 100;
-  const copAmount = (BigInt(usdCents) * copPerUsd) / BigInt(100);
+  const copm = getCopmTokenConfig();
+  const isMainnet = getCeloNetwork() === "mainnet";
 
   return {
     priceUsd: usd,
     priceUsdCents: usdCents,
     copPerUsd: copPerUsd.toString(),
     copRateSource: rateSource ?? "env",
-    copAmount: copAmount.toString(),
-    usdcAmount: formatUnits(getRecoveryPriceAtomic("USDC"), TOKEN_DECIMALS),
-    copmAmount: formatUnits(
-      getRecoveryPriceAtomic("tCOPM", copPerUsd),
-      TOKEN_DECIMALS
+    copAmount: isMainnet
+      ? String(getRecoveryCcopmFixed())
+      : ((BigInt(usdCents) * copPerUsd) / BigInt(100)).toString(),
+    usdcAmount: formatUnits(
+      getRecoveryPriceAtomic("USDC"),
+      getUsdcTokenConfig().decimals
     ),
+    copmAmount: formatUnits(
+      getRecoveryPriceAtomic(copm.id, copPerUsd),
+      copm.decimals
+    ),
+    copmSymbol: isMainnet ? "cCOP" : copm.symbol,
   };
 }
 

@@ -4,8 +4,8 @@ export const MAX_LIFE_REFILLS_PER_DAY = 1;
 export const XP_PER_CORRECT = 2;
 export const MAX_DAILY_XP = 10;
 
-/** Base life recovery price: $0.10 USD (see pricing/recovery-price.ts). */
-export const RECOVERY_PRICE_USD_CENTS = 10;
+/** Base life recovery price in USD cents (see pricing/recovery-price.ts). */
+export const RECOVERY_PRICE_USD_CENTS = 1;
 
 export {
   LEARNING_TIERS as LEVELS,

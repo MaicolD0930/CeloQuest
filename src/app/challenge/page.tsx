@@ -121,7 +121,7 @@ export default function ChallengePage() {
   const [sessionWallet, setSessionWallet] = useState<string | null>(null);
   const [selectedWallet, setSelectedWallet] = useState<WalletProviderId | null>(null);
   const [tokenPriceLabels, setTokenPriceLabels] = useState<Record<string, string>>({});
-  const [recoveryPriceUsd, setRecoveryPriceUsd] = useState(0.1);
+  const [recoveryPriceUsd, setRecoveryPriceUsd] = useState(0.01);
   const [copPerUsd, setCopPerUsd] = useState("");
 
   useEffect(() => {
@@ -629,6 +629,7 @@ export default function ChallengePage() {
     if (override) return override;
     if (tokenPriceLabels[token]) return tokenPriceLabels[token];
     if (token === "USDC") return `${recoveryPriceUsd.toFixed(2)} USDC`;
+    if (token === "cCOPM") return tokenPriceLabels.cCOPM ?? "10 cCOP";
     return `${recoveryPriceUsd.toFixed(2)} USD`;
   }
 
@@ -962,7 +963,11 @@ export default function ChallengePage() {
             timerPaused
             timeLabel={t.challenge.elapsedTime}
             recoverLabel={t.challenge.recoverEnergy}
-            refillNote={`$${recoveryPriceUsd.toFixed(2)} USD${copPerUsd ? ` · 1 USD = ${Number(copPerUsd).toLocaleString()} COP` : ""} · ${t.challenge.oneRefillPerDay}`}
+            refillNote={
+              Object.keys(tokenPriceLabels).length > 0
+                ? `${Object.values(tokenPriceLabels).join(" · ")} · ${t.challenge.oneRefillPerDay}`
+                : `$${recoveryPriceUsd.toFixed(2)} USD${copPerUsd ? ` · 1 USD = ${Number(copPerUsd).toLocaleString()} COP` : ""} · ${t.challenge.oneRefillPerDay}`
+            }
             tokenPriceLabels={tokenPriceLabels}
             tokenBalance={tokenBalance}
             balanceLabel={t.challenge.yourBalance}

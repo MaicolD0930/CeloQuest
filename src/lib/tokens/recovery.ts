@@ -38,12 +38,15 @@ export function getCopmTokenConfig(): RecoveryTokenConfig {
   const network = getCeloNetwork();
 
   if (network === "mainnet") {
+    const addr =
+      readAddress("CCOPM_ADDRESS", "NEXT_PUBLIC_CCOPM_ADDRESS") ??
+      ("0x8A567e2aE79CA692Bd748aB832081C45de4041eA" as `0x${string}`);
     return {
       id: "cCOPM",
-      symbol: "cCOPM",
+      symbol: "cCOP",
       name: "Celo Colombian Peso",
-      decimals: 6,
-      address: readAddress("CCOPM_ADDRESS", "NEXT_PUBLIC_CCOPM_ADDRESS"),
+      decimals: 18,
+      address: addr,
     };
   }
 
@@ -57,12 +60,19 @@ export function getCopmTokenConfig(): RecoveryTokenConfig {
 }
 
 export function getUsdcTokenConfig(): RecoveryTokenConfig {
+  const network = getCeloNetwork();
+  const defaultAddr =
+    network === "mainnet"
+      ? "0xcebA9300f2b948710d2653dD7B07f33A8B32118C"
+      : "0x01C5C0122039549AD1493B8220cABEdD739BC44E";
   return {
     id: "USDC",
     symbol: "USDC",
     name: "USD Coin",
     decimals: 6,
-    address: readAddress("USDC_ADDRESS", "NEXT_PUBLIC_USDC_ADDRESS"),
+    address:
+      readAddress("USDC_ADDRESS", "NEXT_PUBLIC_USDC_ADDRESS") ??
+      (defaultAddr as `0x${string}`),
   };
 }
 

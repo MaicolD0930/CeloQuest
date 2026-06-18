@@ -12,11 +12,12 @@ import { getActiveChain, getRpcUrl, getTxExplorerUrl } from "@/lib/chain/config"
 import {
   getRewardsContractAddress,
   rewardsContractAbi,
-  WEEKLY_REWARD_USDC,
+  WEEKLY_REWARD_USDC_ACTUAL,
+  WEEKLY_REWARD_USDC_DISPLAY,
   weekKeyToSeasonId,
 } from "@/lib/contracts/rewards-abi";
 
-export { WEEKLY_REWARD_USDC, weekKeyToSeasonId };
+export { WEEKLY_REWARD_USDC_DISPLAY as WEEKLY_REWARD_USDC, weekKeyToSeasonId };
 
 export type SeasonWinner = {
   userId: string;
@@ -127,7 +128,7 @@ export async function getSeasonRewardStatus(
     rewardTxHash: season.rewardTxHash,
     rewardPaidAt: season.rewardPaidAt?.toISOString() ?? null,
     winner,
-    prizeAmount: WEEKLY_REWARD_USDC,
+    prizeAmount: WEEKLY_REWARD_USDC_DISPLAY,
     prizeSymbol: "USDC",
     onChainSeasonId,
     contractAddress,
@@ -310,7 +311,7 @@ async function recordSeasonRewardPayment(params: {
     data: {
       rewardPaid: true,
       rewardWinnerWallet: params.winner.walletAddress.toLowerCase(),
-      rewardAmount: WEEKLY_REWARD_USDC,
+      rewardAmount: WEEKLY_REWARD_USDC_ACTUAL,
       rewardTxHash: params.txHash.toLowerCase(),
       rewardPaidAt: paidAt,
     },
@@ -325,7 +326,7 @@ async function recordSeasonRewardPayment(params: {
     },
     data: {
       status: "paid",
-      amount: WEEKLY_REWARD_USDC,
+      amount: WEEKLY_REWARD_USDC_ACTUAL,
       txHash: params.txHash.toLowerCase(),
     },
   });
@@ -347,7 +348,7 @@ async function recordSeasonRewardPayment(params: {
         walletAddress: params.winner.walletAddress.toLowerCase(),
         rank: 1,
         rewardType: "token",
-        amount: WEEKLY_REWARD_USDC,
+        amount: WEEKLY_REWARD_USDC_ACTUAL,
         status: "paid",
         txHash: params.txHash.toLowerCase(),
       },
@@ -384,7 +385,7 @@ async function syncSeasonPaidFromChain(seasonId: string, weekKey: string) {
     data: {
       rewardPaid: true,
       rewardWinnerWallet: winner.walletAddress.toLowerCase(),
-      rewardAmount: WEEKLY_REWARD_USDC,
+      rewardAmount: WEEKLY_REWARD_USDC_ACTUAL,
       rewardPaidAt: new Date(),
     },
   });

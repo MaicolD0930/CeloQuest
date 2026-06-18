@@ -4,6 +4,7 @@ import { MINIPAY_SEPOLIA, MINIPAY_MAINNET } from "@/lib/chain/minipay-tokens";
 import {
   getCopmTokenConfig,
   getRecoveryTokenAddress,
+  getRecoveryTokenConfig,
   getUsdcTokenConfig,
   normalizeRecoveryTokenParam,
   type RecoveryTokenId,
@@ -133,11 +134,15 @@ export function buildPaymentRecordFromEvent(params: {
         ? getCopmTokenConfig().symbol
         : symbolForTokenAddress(params.tokenAddress);
 
+  const decimals =
+    (tokenId && getRecoveryTokenConfig(tokenId)?.decimals) ??
+    getCopmTokenConfig().decimals;
+
   return {
     userWallet: params.userWallet.toLowerCase(),
     tokenAddress: params.tokenAddress.toLowerCase(),
     tokenSymbol: symbol,
-    amount: formatUnits(params.amountAtomic, 6),
+    amount: formatUnits(params.amountAtomic, decimals),
     txHash: params.txHash.toLowerCase(),
   };
 }

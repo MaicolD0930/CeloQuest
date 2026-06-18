@@ -1,2 +1,2 @@
 /** Visible app version — bump when shipping MiniPay / payment compatibility fixes. */
-export const APP_DISPLAY_VERSION = "2.7.0";
+export const APP_DISPLAY_VERSION = "3.0.0";

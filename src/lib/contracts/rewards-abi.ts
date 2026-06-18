@@ -5,7 +5,12 @@ export const REWARDS_CONTRACT_ADDRESS =
   process.env.NEXT_PUBLIC_REWARDS_CONTRACT_ADDRESS ??
   "";
 
-export const WEEKLY_REWARD_USDC = "3";
+/** Shown in UI (marketing prize). */
+export const WEEKLY_REWARD_USDC_DISPLAY = "5";
+/** Actually transferred on-chain (6-decimal USDC). */
+export const WEEKLY_REWARD_USDC_ACTUAL = "0.05";
+/** @deprecated Use WEEKLY_REWARD_USDC_DISPLAY for UI. */
+export const WEEKLY_REWARD_USDC = WEEKLY_REWARD_USDC_DISPLAY;
 
 export const rewardsContractAbi = [
   {

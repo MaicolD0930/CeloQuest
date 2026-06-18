@@ -15,7 +15,7 @@ const es = {
     stats: [
       { value: "150+", label: "Preguntas" },
       { value: "5", label: "Retos / día" },
-      { value: "3", label: "USDC / semana" },
+      { value: "5", label: "USDC / semana" },
     ],
   },
   onboarding: {
@@ -148,7 +148,7 @@ const es = {
       {
         question: "¿Cómo funciona el ranking semanal?",
         answer:
-          "Cada semana es una nueva carrera. Suma XP, escala en el leaderboard y compite por 3 USDC para el campeón semanal.",
+          "Cada semana es una nueva carrera. Suma XP, escala en el leaderboard y compite por 5 USDC para el campeón semanal.",
       },
       {
         question: "¿Qué pasa si pierdo mi vida diaria?",
@@ -163,7 +163,7 @@ const es = {
       {
         question: "¿Qué recompensas puedo recibir?",
         answer:
-          "Medallas personales en la app, premio semanal de 3 USDC al campeón y reconocimiento ante la comunidad. Juega, aprende y convierte tu progreso en recompensas reales.",
+          "Medallas personales en la app, premio semanal de 5 USDC al campeón y reconocimiento ante la comunidad. Juega, aprende y convierte tu progreso en recompensas reales.",
       },
       {
         question: "¿Dónde veo mis logros?",
@@ -348,7 +348,7 @@ const es = {
     recoverEnergy: "Recuperar energía mediante pago",
     oneRefillPerDay: "Máximo 1 recuperación por día",
     payAndRecover: "Pagar y recuperar vida",
-    refillPriceNote: "0.10 por recuperación",
+    refillPriceNote: "0.01 USDC o 10 cCOP por recuperación",
     selectPaymentToken: "Moneda de pago",
     payWithToken: "Pagar con {token}",
     insufficientBalance: "Saldo insuficiente. Necesitas al menos {amount}.",
@@ -505,7 +505,7 @@ const en: Dict = {
     stats: [
       { value: "150+", label: "Questions" },
       { value: "5", label: "Per day" },
-      { value: "3", label: "USDC/wk" },
+      { value: "5", label: "USDC/wk" },
     ],
   },
   onboarding: {
@@ -638,7 +638,7 @@ const en: Dict = {
       {
         question: "How does the weekly ranking work?",
         answer:
-          "Every week is a fresh race. Earn XP, climb the leaderboard, and compete for 3 USDC awarded to the weekly champion.",
+          "Every week is a fresh race. Earn XP, climb the leaderboard, and compete for 5 USDC awarded to the weekly champion.",
       },
       {
         question: "What happens if I lose my daily life?",
@@ -653,7 +653,7 @@ const en: Dict = {
       {
         question: "What rewards can I receive?",
         answer:
-          "Personal in-app badges, a weekly 3 USDC prize for the champion, and community recognition. Play, learn, and turn your progress into real rewards.",
+          "Personal in-app badges, a weekly 5 USDC prize for the champion, and community recognition. Play, learn, and turn your progress into real rewards.",
       },
       {
         question: "Where can I see my achievements?",
@@ -838,7 +838,7 @@ const en: Dict = {
     recoverEnergy: "Recover energy with payment",
     oneRefillPerDay: "Max 1 recovery per day",
     payAndRecover: "Pay and recover life",
-    refillPriceNote: "0.10 per recovery",
+    refillPriceNote: "0.01 USDC or 10 cCOP per recovery",
     selectPaymentToken: "Payment currency",
     payWithToken: "Pay with {token}",
     insufficientBalance: "Insufficient balance. You need at least {amount}.",

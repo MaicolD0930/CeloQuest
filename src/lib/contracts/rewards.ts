@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/prisma";
-import { WEEKLY_REWARD_USDC } from "@/lib/contracts/rewards-abi";
+import {
+  WEEKLY_REWARD_USDC_ACTUAL,
+} from "@/lib/contracts/rewards-abi";
 
 type Winner = { walletAddress: `0x${string}`; rank: number };
 
@@ -33,7 +35,7 @@ export async function prepareWeeklyRewardDistribution(
       walletAddress: user.walletAddress,
       rank: 1,
       rewardType: "token",
-      amount: WEEKLY_REWARD_USDC,
+      amount: WEEKLY_REWARD_USDC_ACTUAL,
       status: "pending",
     },
   });

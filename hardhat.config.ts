@@ -21,6 +21,11 @@ const config: HardhatUserConfig = {
     artifacts: "./contracts/artifacts",
   },
   networks: {
+    celo: {
+      url: process.env.CELO_RPC_URL ?? "https://forno.celo.org",
+      chainId: 42220,
+      accounts: deployerKey ? [deployerKey] : [],
+    },
     celoSepolia: {
       url:
         process.env.CELO_SEPOLIA_RPC_URL ??

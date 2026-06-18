@@ -17,8 +17,8 @@ contract CeloQuestRewards is Ownable, ReentrancyGuard {
 
     IERC20 public immutable rewardToken;
 
-    /// @dev 3 USDC with 6 decimals
-    uint256 public constant REWARD_AMOUNT = 3 * 10 ** 6;
+    /// @dev 0.05 USDC with 6 decimals (UI shows 5 USDC marketing prize)
+    uint256 public constant REWARD_AMOUNT = 50_000;
 
     /// @dev Backend wallet allowed to finalize on schedule (automation).
     address public automator;

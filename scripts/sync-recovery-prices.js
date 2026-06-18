@@ -2,22 +2,21 @@ require("dotenv").config();
 const hre = require("hardhat");
 
 const { fetchCopPerUsd } = require("./lib/cop-usd-rate");
-
-function getUsdCents() {
-  return parseInt(process.env.RECOVERY_PRICE_USD_CENTS ?? "10", 10);
-}
-
-function priceAtomic(usdCents, copPerUsd, isUsdc) {
-  if (isUsdc) return BigInt(usdCents) * 10000n;
-  return BigInt(usdCents) * copPerUsd * 10000n;
-}
+const {
+  getUsdCents,
+  getFixedCcopmAmount,
+  isMainnetDeploy,
+  usdcPriceAtomic,
+  copmPriceAtomic,
+} = require("./lib/recovery-prices");
 
 /**
- * Sync on-chain recovery prices using live COP/USD (or COP_PER_USD fallback).
+ * Sync on-chain recovery prices (live COP/USD on Sepolia; fixed cCOP on mainnet).
  * Usage: npm run contracts:sync:recovery-prices
  */
 async function main() {
   const { ethers } = hre;
+  const mainnet = isMainnetDeploy(hre.network.name);
   const address =
     process.env.RECOVERY_CONTRACT_ADDRESS ??
     process.env.NEXT_PUBLIC_RECOVERY_CONTRACT_ADDRESS;
@@ -26,13 +25,16 @@ async function main() {
 
   const tcopm =
     process.env.TCOPM_ADDRESS ?? process.env.NEXT_PUBLIC_TCOPM_ADDRESS;
+  const ccopm =
+    process.env.CCOPM_ADDRESS ?? process.env.NEXT_PUBLIC_CCOPM_ADDRESS;
   const usdc =
     process.env.USDC_ADDRESS ?? process.env.NEXT_PUBLIC_USDC_ADDRESS;
 
+  const copmToken = mainnet ? ccopm : tcopm;
   const usdCents = getUsdCents();
-  const copPerUsd = await fetchCopPerUsd();
-  const usdcPrice = priceAtomic(usdCents, copPerUsd, true);
-  const copmPrice = priceAtomic(usdCents, copPerUsd, false);
+  const copPerUsd = mainnet ? null : await fetchCopPerUsd();
+  const usdcPrice = usdcPriceAtomic(usdCents);
+  const copmPrice = copmPriceAtomic(usdCents, copPerUsd ?? 0n, mainnet);
 
   const contract = await ethers.getContractAt(
     "RecoveryPaymentContract",
@@ -41,13 +43,17 @@ async function main() {
 
   console.log("Syncing prices on", address);
   console.log("  USD:", (usdCents / 100).toFixed(2));
-  console.log("  COP/USD:", copPerUsd.toString());
+  if (mainnet) {
+    console.log("  cCOP fixed:", getFixedCcopmAmount());
+  } else {
+    console.log("  COP/USD:", copPerUsd.toString());
+  }
 
-  if (tcopm) {
-    await (await contract.setAllowedToken(tcopm, true)).wait();
-    const tx = await contract.setRecoveryPriceForToken(tcopm, copmPrice);
+  if (copmToken) {
+    await (await contract.setAllowedToken(copmToken, true)).wait();
+    const tx = await contract.setRecoveryPriceForToken(copmToken, copmPrice);
     await tx.wait();
-    console.log("  tCOPM →", copmPrice.toString());
+    console.log(`  ${mainnet ? "cCOP" : "tCOPM"} →`, copmPrice.toString());
   }
 
   if (usdc) {
