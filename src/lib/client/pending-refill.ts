@@ -53,10 +53,18 @@ export type RefillApiSuccess = {
   activeDurationMs?: number;
 };
 
-/** POST /api/challenge/refill with timeout; retries until receipt is indexed. */
 export type RefillProgress = {
   attempt: number;
   maxAttempts: number;
+};
+
+export type RefillPollOptions = {
+  maxWallMs?: number;
+  retryDelayMs?: number;
+  fetchTimeoutMs?: number;
+  /** Poll /today less often — MiniPay webview struggles with many parallel fetches. */
+  lightMode?: boolean;
+  onProgress?: (progress: RefillProgress) => void;
 };
 
 /** If refill already applied server-side, sync client state without another payment. */
@@ -88,16 +96,12 @@ export async function tryRecoverRefillStateFromServer(): Promise<RefillApiSucces
 export async function postRefillUntilConfirmed(
   txHash: string,
   token: RecoveryTokenId,
-  options?: {
-    maxWallMs?: number;
-    retryDelayMs?: number;
-    fetchTimeoutMs?: number;
-    onProgress?: (progress: RefillProgress) => void;
-  }
+  options?: RefillPollOptions
 ): Promise<{ ok: true; data: RefillApiSuccess } | { ok: false; error?: string }> {
-  const maxWallMs = options?.maxWallMs ?? 90_000;
-  const retryDelayMs = options?.retryDelayMs ?? 2000;
-  const fetchTimeoutMs = options?.fetchTimeoutMs ?? 12_000;
+  const light = options?.lightMode ?? false;
+  const maxWallMs = options?.maxWallMs ?? (light ? 40_000 : 90_000);
+  const retryDelayMs = options?.retryDelayMs ?? (light ? 5_000 : 2_000);
+  const fetchTimeoutMs = options?.fetchTimeoutMs ?? (light ? 18_000 : 12_000);
   const deadline = Date.now() + maxWallMs;
   const maxAttempts = Math.max(1, Math.ceil(maxWallMs / retryDelayMs));
 
@@ -108,8 +112,10 @@ export async function postRefillUntilConfirmed(
     attempt += 1;
     options?.onProgress?.({ attempt, maxAttempts });
 
-    const recovered = await tryRecoverRefillStateFromServer();
-    if (recovered) return { ok: true, data: recovered };
+    if (!light || attempt === 1 || attempt % 4 === 0) {
+      const recovered = await tryRecoverRefillStateFromServer();
+      if (recovered) return { ok: true, data: recovered };
+    }
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), fetchTimeoutMs);
@@ -176,8 +182,7 @@ function shouldRetryRefill(error: string | undefined, status: number): boolean {
     error === "INVALID_PAYMENT" ||
     error === "REQUEST_TIMEOUT" ||
     error === "NETWORK_ERROR" ||
-    error === "SERVER_ERROR" ||
-    error === "VERIFY_TIMEOUT"
+    error === "SERVER_ERROR"
   ) {
     return true;
   }

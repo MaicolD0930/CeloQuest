@@ -25,7 +25,6 @@ import {
   hasSufficientCopmBalance,
 } from "@/lib/tokens/tcopm";
 import {
-  assertProviderOnActiveChain,
   discoverWalletProviders,
   ensureCorrectChain,
   hasAnyWalletInstalled,
@@ -416,9 +415,7 @@ export async function sendRecoveryPayment(
 
   const provider = resolveWalletProvider(providerId);
   const miniPayPay = isMiniPayPayment(providerId);
-  if (miniPayPay) {
-    await assertProviderOnActiveChain(provider);
-  } else {
+  if (!miniPayPay) {
     await ensureCorrectChain(provider);
   }
 
@@ -429,9 +426,16 @@ export async function sendRecoveryPayment(
   const accounts = await walletClient.requestAddresses();
   if (accounts.length === 0) throw new Error("NO_ACCOUNT");
 
-  const expected = payer.toLowerCase();
-  const account = accounts.find((a) => a.toLowerCase() === expected);
-  if (!account) throw new Error("WALLET_MISMATCH");
+  let account: `0x${string}`;
+  if (miniPayPay) {
+    // MiniPay: always use the active in-app account (session wallet can lag).
+    account = accounts[0];
+  } else {
+    const expected = payer.toLowerCase();
+    const matched = accounts.find((a) => a.toLowerCase() === expected);
+    if (!matched) throw new Error("WALLET_MISMATCH");
+    account = matched;
+  }
 
   if (miniPayPay) {
     const hash = await sendMiniPayDirectTransfer(

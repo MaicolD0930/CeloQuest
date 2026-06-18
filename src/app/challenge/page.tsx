@@ -42,6 +42,7 @@ import {
   type RefillApiSuccess,
 } from "@/lib/client/pending-refill";
 import {
+  connectWallet,
   sendRecoveryPayment,
   type RecoveryToken,
 } from "@/lib/wallet";
@@ -329,8 +330,10 @@ export default function ChallengePage() {
     setRefillStatus(t.challenge.confirmingPayment);
 
     const result = await postRefillUntilConfirmed(txHash, token, {
-      maxWallMs: miniPay ? 90_000 : 60_000,
-      retryDelayMs: 2000,
+      lightMode: miniPay,
+      maxWallMs: miniPay ? 40_000 : 60_000,
+      retryDelayMs: miniPay ? 5_000 : 2_000,
+      fetchTimeoutMs: miniPay ? 18_000 : 12_000,
       onProgress: ({ attempt, maxAttempts }) => {
         setRefillStatus(
           t.challenge.confirmingPaymentProgress
@@ -357,34 +360,16 @@ export default function ChallengePage() {
 
   async function handleRetryVerify() {
     const pending = readPendingRefill();
-    if (!pending) return;
+    if (!pending || refilling) return;
     setRefilling(true);
     setRefillError(null);
+    setRefillStep("confirming");
     try {
       await confirmRefillOnServer(pending.txHash, pending.token);
     } finally {
       setRefilling(false);
     }
   }
-
-  useEffect(() => {
-    if (!awaitingRefill || refilling) return;
-    const pending = readPendingRefill();
-    if (!pending) return;
-
-    let cancelled = false;
-    setRefilling(true);
-    void (async () => {
-      const ok = await confirmRefillOnServer(pending.txHash, pending.token);
-      if (!cancelled && !ok) setRefilling(false);
-      else if (!cancelled) setRefilling(false);
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- resume pending payment once
-  }, [awaitingRefill]);
 
   useEffect(() => {
     setLoading(true);
@@ -590,11 +575,13 @@ export default function ChallengePage() {
     const code =
       apiError ??
       (err instanceof Error ? err.message.split(":")[0] : undefined);
-    const detail =
+    let detail =
       err instanceof Error && err.message.includes(":")
         ? err.message.slice(err.message.indexOf(":") + 1).trim()
         : apiError;
-    if (!miniPay) return base;
+    if (detail && detail.length > 72) {
+      detail = `${detail.slice(0, 69)}…`;
+    }
     return detail && detail !== base ? `${base} [${detail}]` : code ? `${base} [${code}]` : base;
   }
 
@@ -622,17 +609,30 @@ export default function ChallengePage() {
     setRefillStatus(t.challenge.openingWallet);
     try {
       let payerWallet = sessionWallet;
+
+      if (miniPay) {
+        try {
+          payerWallet = await connectWallet("minipay");
+          setSessionWallet(payerWallet);
+        } catch (err) {
+          setRefillStep("idle");
+          setRefillStatus(null);
+          setRefillError(formatRefillError(err));
+          return;
+        }
+      }
+
       const balRes = await fetch(
         `/api/wallet/recovery-balance?token=${encodeURIComponent(payToken)}`,
         { credentials: "include" }
       );
       if (balRes.ok) {
         const bal = await balRes.json();
-        if (typeof bal.walletAddress === "string") {
+        if (typeof bal.walletAddress === "string" && !miniPay) {
           payerWallet = bal.walletAddress;
           setSessionWallet(bal.walletAddress);
         }
-        if (!bal.sufficient) {
+        if (!miniPay && !bal.sufficient) {
           setRefillStep("idle");
           setRefillStatus(null);
           setRefillError(
@@ -644,6 +644,18 @@ export default function ChallengePage() {
             )
           );
           return;
+        }
+        if (miniPay && typeof bal.walletAddress === "string") {
+          const sessionAddr = bal.walletAddress.toLowerCase();
+          if (payerWallet && payerWallet.toLowerCase() !== sessionAddr) {
+            setRefillStep("idle");
+            setRefillStatus(null);
+            setRefillError(t.challenge.walletMismatch);
+            return;
+          }
+        }
+        if (miniPay && typeof bal.display === "string" && bal.symbol) {
+          setTokenBalance(`${bal.display} ${bal.symbol}`);
         }
         if (
           !miniPay &&
@@ -657,6 +669,8 @@ export default function ChallengePage() {
           return;
         }
       }
+
+      clearPendingRefill();
 
       const { hash: txHash, token: paidToken } = await sendRecoveryPayment(
         payToken,
