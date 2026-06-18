@@ -5,7 +5,13 @@ import { todayKey } from "@/lib/game";
 import {
   API_REFILL_VERIFY_MS,
   verifyAndRecordRecoveryPayment,
+  verifyRecoveryPayment,
 } from "@/lib/payments/recovery";
+import {
+  markRecoveryPaymentFailed,
+  recordPendingRecoveryPayment,
+  recordRecoveryPayment,
+} from "@/lib/payments/record-payment";
 import { normalizeRecoveryTokenParam } from "@/lib/tokens/recovery";
 
 export type RefillConfirmed = {
@@ -84,6 +90,23 @@ async function applyRefillToAttempt(
   });
 }
 
+async function revokeOptimisticRefill(
+  attemptId: string,
+  txHash: string
+): Promise<void> {
+  await markRecoveryPaymentFailed(txHash);
+  await prisma.dailyAttempt.update({
+    where: { id: attemptId },
+    data: {
+      livesLeft: 0,
+      lifeRefillUsed: false,
+      result: "awaiting_refill",
+      refillTxHash: null,
+      refillToken: null,
+    },
+  });
+}
+
 function confirmedFromAttempt(attempt: DailyAttempt): RefillConfirmed {
   return {
     status: "confirmed",
@@ -93,9 +116,31 @@ function confirmedFromAttempt(attempt: DailyAttempt): RefillConfirmed {
   };
 }
 
+async function finalizeVerifiedRefill(
+  attempt: DailyAttempt,
+  txHash: string,
+  token: string,
+  payment: Parameters<typeof recordRecoveryPayment>[0]
+): Promise<RefillConfirmed> {
+  await recordRecoveryPayment(payment, "confirmed");
+
+  const alreadyUsedTx = await prisma.dailyAttempt.findFirst({
+    where: { refillTxHash: txHash },
+  });
+  if (alreadyUsedTx && alreadyUsedTx.id !== attempt.id) {
+    throw new Error("TX_ALREADY_USED");
+  }
+
+  const updated =
+    attempt.refillTxHash === txHash && attempt.livesLeft > 0
+      ? attempt
+      : await applyRefillToAttempt(attempt.id, txHash, token);
+
+  return confirmedFromAttempt(updated);
+}
+
 /**
- * Idempotent refill: verify on-chain payment, persist, grant life.
- * Returns pending (not failed) while the receipt is still indexing.
+ * Idempotent refill: optimistic grant (MiniPay) or on-chain verify + grant.
  */
 export async function processRefillRequest(params: {
   userId: string;
@@ -103,6 +148,7 @@ export async function processRefillRequest(params: {
   payerWallet?: string;
   txHash: string;
   token: string;
+  optimistic?: boolean;
   verifyMaxWaitMs?: number;
 }): Promise<RefillProcessResult> {
   const { userId, walletAddress, txHash } = params;
@@ -121,6 +167,14 @@ export async function processRefillRequest(params: {
     return { status: "failed", reason: "Challenge already completed" };
   }
 
+  const existingPayment = await prisma.payment.findUnique({
+    where: { txHash },
+  });
+
+  if (existingPayment?.status === "failed") {
+    return { status: "failed", reason: "TX_FAILED" };
+  }
+
   if (attempt.lifeRefillUsed && attempt.refillTxHash === txHash) {
     return confirmedFromAttempt(attempt);
   }
@@ -133,40 +187,66 @@ export async function processRefillRequest(params: {
     return { status: "failed", reason: "Refill not available" };
   }
 
-  const existingPayment = await prisma.payment.findUnique({
-    where: { txHash },
-  });
   if (
-    existingPayment &&
+    existingPayment?.status === "confirmed" &&
     existingPayment.userWallet.toLowerCase() === payerWallet.toLowerCase()
   ) {
     const updated = await applyRefillToAttempt(attempt.id, txHash, token);
     return confirmedFromAttempt(updated);
   }
 
-  const verification = await verifyAndRecordRecoveryPayment(
-    txHash as Hash,
-    payerWallet,
-    token,
-    { maxWaitMs: params.verifyMaxWaitMs ?? API_REFILL_VERIFY_MS }
-  );
+  // MiniPay: wallet returned hash — grant life immediately, verify later.
+  if (params.optimistic) {
+    await recordPendingRecoveryPayment({
+      txHash,
+      userWallet: payerWallet,
+      token,
+    });
+    const updated = await applyRefillToAttempt(attempt.id, txHash, token);
+    return confirmedFromAttempt(updated);
+  }
+
+  const verifyMs = params.verifyMaxWaitMs ?? API_REFILL_VERIFY_MS;
+  const alreadyGranted =
+    attempt.refillTxHash === txHash &&
+    attempt.livesLeft > 0 &&
+    existingPayment?.status === "pending";
+
+  const verification = alreadyGranted
+    ? await verifyRecoveryPayment(txHash as Hash, payerWallet, token, {
+        maxWaitMs: verifyMs,
+      })
+    : await verifyAndRecordRecoveryPayment(
+        txHash as Hash,
+        payerWallet,
+        token,
+        { maxWaitMs: verifyMs }
+      );
 
   if (!verification.ok) {
+    if (verification.reason === "TX_FAILED" && alreadyGranted) {
+      await revokeOptimisticRefill(attempt.id, txHash);
+      return { status: "failed", reason: "TX_FAILED" };
+    }
     if (isPendingReason(verification.reason)) {
+      if (alreadyGranted) {
+        return { status: "pending", reason: verification.reason };
+      }
       return { status: "pending", reason: verification.reason };
     }
     return { status: "failed", reason: verification.reason };
   }
 
-  const alreadyUsedTx = await prisma.dailyAttempt.findFirst({
-    where: { refillTxHash: txHash },
-  });
-  if (alreadyUsedTx && alreadyUsedTx.id !== attempt.id) {
+  try {
+    return await finalizeVerifiedRefill(
+      attempt,
+      txHash,
+      token,
+      verification.payment
+    );
+  } catch {
     return { status: "failed", reason: "TX_ALREADY_USED" };
   }
-
-  const updated = await applyRefillToAttempt(attempt.id, txHash, token);
-  return confirmedFromAttempt(updated);
 }
 
 export function httpStatusForRefill(result: RefillProcessResult): number {

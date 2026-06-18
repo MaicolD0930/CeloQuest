@@ -125,11 +125,12 @@ async function requestRefillOnce(
   token: RecoveryTokenId,
   fetchTimeoutMs: number,
   method: "POST" | "GET" = "POST",
-  payerWallet?: string
+  payerWallet?: string,
+  optimistic = false
 ): Promise<RefillApiBody & { httpStatus: number }> {
   const url =
     method === "GET"
-      ? `/api/challenge/refill/status?txHash=${encodeURIComponent(txHash)}&token=${encodeURIComponent(token)}`
+      ? `/api/challenge/refill/status?txHash=${encodeURIComponent(txHash)}&token=${encodeURIComponent(token)}${payerWallet ? `&payerWallet=${encodeURIComponent(payerWallet)}` : ""}`
       : "/api/challenge/refill";
 
   try {
@@ -139,7 +140,12 @@ async function requestRefillOnce(
       headers: method === "POST" ? { "Content-Type": "application/json" } : undefined,
       body:
         method === "POST"
-          ? JSON.stringify({ txHash, token, payerWallet })
+          ? JSON.stringify({
+              txHash,
+              token,
+              payerWallet,
+              ...(optimistic ? { optimistic: true } : {}),
+            })
           : undefined,
       label: `${method} ${url}`,
       timeoutMs: fetchTimeoutMs,
@@ -257,6 +263,57 @@ export async function pollRefillUntilConfirmed(
   }
 
   return { outcome: "pending", reason: lastReason };
+}
+
+/** MiniPay: one fast POST — grant life immediately (server records pending tx). */
+export async function requestOptimisticRefill(
+  txHash: string,
+  token: RecoveryTokenId,
+  payerWallet?: string
+): Promise<
+  | { outcome: "confirmed"; data: RefillApiSuccess }
+  | { outcome: "failed"; error: string }
+> {
+  const body = await requestRefillOnce(
+    txHash,
+    token,
+    12_000,
+    "POST",
+    payerWallet,
+    true
+  );
+  const parsed = parseRefillResponse(body);
+  if (parsed.outcome === "confirmed") return parsed;
+  if (parsed.outcome === "failed") return parsed;
+  return { outcome: "failed", error: parsed.reason };
+}
+
+/** Verify optimistic refill on-chain without blocking the UI. */
+export function startBackgroundRefillVerification(
+  txHash: string,
+  token: RecoveryTokenId,
+  options?: {
+    payerWallet?: string;
+    onFailed?: (reason: string) => void;
+    onConfirmed?: () => void;
+  }
+): void {
+  void (async () => {
+    const result = await pollRefillUntilConfirmed(txHash, token, {
+      payerWallet: options?.payerWallet,
+      maxWallMs: 240_000,
+      retryDelayMs: 8_000,
+      fetchTimeoutMs: 15_000,
+    });
+    if (result.outcome === "confirmed") {
+      clearPendingRefill();
+      options?.onConfirmed?.();
+      return;
+    }
+    if (result.outcome === "failed") {
+      options?.onFailed?.(result.error);
+    }
+  })();
 }
 
 /** @deprecated Use pollRefillUntilConfirmed */

@@ -157,8 +157,10 @@ model Payment {
   tokenSymbol  String
   amount       String
   txHash       String   @unique
+  status       String   @default("confirmed")
   createdAt    DateTime @default(now())
 
   @@index([userWallet])
   @@index([createdAt])
+  @@index([status])
 }

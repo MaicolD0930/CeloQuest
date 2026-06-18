@@ -28,9 +28,13 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "txHash required" }, { status: 400 });
     }
 
+    const payerWallet =
+      req.nextUrl.searchParams.get("payerWallet") ?? undefined;
+
     const result = await processRefillRequest({
       userId: user.id,
       walletAddress: user.walletAddress,
+      payerWallet: payerWallet ?? undefined,
       txHash,
       token,
     });

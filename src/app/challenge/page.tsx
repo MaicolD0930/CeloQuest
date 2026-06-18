@@ -38,7 +38,9 @@ import {
   clearPendingRefill,
   pollRefillUntilConfirmed,
   readPendingRefill,
+  requestOptimisticRefill,
   savePendingRefill,
+  startBackgroundRefillVerification,
   tryRecoverRefillStateFromServer,
   type RefillApiSuccess,
 } from "@/lib/client/pending-refill";
@@ -331,11 +333,37 @@ export default function ChallengePage() {
     invalidateMeCache();
   }
 
+  function handleBackgroundRefillFailed(reason: string) {
+    setRefillError(formatRefillError(null, reason));
+    setAwaitingRefill(true);
+    setCanRefill(true);
+    setLivesLeft(0);
+    void syncProgress({ soft: true });
+  }
+
   async function confirmRefillOnServer(
     txHash: string,
     token: RecoveryToken,
     payerWallet?: string
   ): Promise<"confirmed" | "pending" | "failed"> {
+    if (miniPay) {
+      const result = await requestOptimisticRefill(txHash, token, payerWallet);
+      if (result.outcome === "confirmed") {
+        setRefillStep("success");
+        setRefillStatus(t.challenge.lifeRestored);
+        applyRefillSuccess(result.data);
+        startBackgroundRefillVerification(txHash, token, {
+          payerWallet,
+          onFailed: handleBackgroundRefillFailed,
+        });
+        return "confirmed";
+      }
+      setRefillStep("idle");
+      setRefillStatus(null);
+      setRefillError(formatRefillError(null, result.error));
+      return "failed";
+    }
+
     setRefillStep("verifying");
     setRefillError(null);
     setRefillStatus(t.challenge.verifyingPayment);
@@ -406,6 +434,23 @@ export default function ChallengePage() {
       if (recovered) {
         setRefillStep("success");
         applyRefillSuccess(recovered);
+        setRefilling(false);
+        return;
+      }
+
+      if (miniPay) {
+        startBackgroundRefillVerification(
+          pending.txHash,
+          pending.token,
+          {
+            payerWallet: sessionWallet ?? undefined,
+            onFailed: handleBackgroundRefillFailed,
+            onConfirmed: () => {
+              setRefillStep("idle");
+              setRefillStatus(null);
+            },
+          }
+        );
         setRefilling(false);
         return;
       }
@@ -727,7 +772,7 @@ export default function ChallengePage() {
           payerWallet = bal.walletAddress;
           setSessionWallet(bal.walletAddress);
         }
-        if (!miniPay && !bal.sufficient) {
+        if (!bal.sufficient) {
           setRefillStep("idle");
           setRefillStatus(null);
           setRefillError(
@@ -774,6 +819,20 @@ export default function ChallengePage() {
       );
 
       savePendingRefill({ txHash, token: paidToken });
+
+      if (miniPay) {
+        setRefillStatus(t.challenge.lifeRestored);
+        const outcome = await confirmRefillOnServer(
+          txHash,
+          paidToken,
+          payerWallet ?? undefined
+        );
+        if (outcome === "failed") {
+          clearPendingRefill();
+        }
+        return;
+      }
+
       setRefillStep("verifying");
       setRefillStatus(t.challenge.verifyingPayment);
       const outcome = await confirmRefillOnServer(

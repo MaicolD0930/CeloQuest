@@ -36,6 +36,7 @@ export async function POST(req: NextRequest) {
       payerWallet,
       txHash,
       token,
+      optimistic: body?.optimistic === true,
     });
 
     if (result.status === "failed") {
