@@ -8,50 +8,38 @@ import {
   toRefillJson,
 } from "@/lib/payments/refill-request";
 
-/** Vercel Hobby caps at 10s — keep verification under that budget. */
 export const maxDuration = 10;
 
-export async function POST(req: NextRequest) {
+/** Lightweight poll: verify receipt + grant life if payment is on-chain. */
+export async function GET(req: NextRequest) {
   try {
     const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    const body = await req.json().catch(() => null);
-    const rawHash = typeof body?.txHash === "string" ? body.txHash : null;
+    const rawHash = req.nextUrl.searchParams.get("txHash");
     const txHash = rawHash ? normalizeTxHash(rawHash) : null;
-    const token = normalizeRecoveryTokenParam(body?.token);
+    const token = normalizeRecoveryTokenParam(
+      req.nextUrl.searchParams.get("token")
+    );
 
     if (!txHash) {
       return NextResponse.json({ error: "txHash required" }, { status: 400 });
     }
 
-    const payerWallet =
-      typeof body?.payerWallet === "string" ? body.payerWallet : undefined;
-
     const result = await processRefillRequest({
       userId: user.id,
       walletAddress: user.walletAddress,
-      payerWallet,
       txHash,
       token,
     });
-
-    if (result.status === "failed") {
-      console.error("refill verification failed", {
-        reason: result.reason,
-        txHash,
-        token,
-        wallet: user.walletAddress,
-      });
-    }
 
     return NextResponse.json(toRefillJson(result), {
       status: httpStatusForRefill(result),
     });
   } catch (error) {
-    console.error("refill route error:", error);
+    console.error("refill status error:", error);
     return NextResponse.json(
       { status: "pending", reason: "SERVER_ERROR" },
       { status: 202 }

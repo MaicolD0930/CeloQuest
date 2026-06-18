@@ -36,9 +36,10 @@ import { useIsMiniPay } from "@/hooks/useIsMiniPay";
 import { isCustomSepoliaTcopm, filterRecoveryTokensForMiniPay } from "@/lib/chain/minipay-tokens";
 import {
   clearPendingRefill,
-  postRefillUntilConfirmed,
+  pollRefillUntilConfirmed,
   readPendingRefill,
   savePendingRefill,
+  tryRecoverRefillStateFromServer,
   type RefillApiSuccess,
 } from "@/lib/client/pending-refill";
 import {
@@ -84,7 +85,7 @@ type Summary = {
   outOfLives: boolean;
 };
 
-type RefillStep = "idle" | "wallet" | "confirming" | "success";
+type RefillStep = "idle" | "wallet" | "verifying" | "success";
 
 export default function ChallengePage() {
   const { t, locale } = useLocale();
@@ -323,39 +324,45 @@ export default function ChallengePage() {
 
   async function confirmRefillOnServer(
     txHash: string,
-    token: RecoveryToken
-  ): Promise<boolean> {
-    setRefillStep("confirming");
+    token: RecoveryToken,
+    payerWallet?: string
+  ): Promise<"confirmed" | "pending" | "failed"> {
+    setRefillStep("verifying");
     setRefillError(null);
-    setRefillStatus(t.challenge.confirmingPayment);
+    setRefillStatus(t.challenge.verifyingPayment);
 
-    const result = await postRefillUntilConfirmed(txHash, token, {
-      lightMode: miniPay,
-      maxWallMs: miniPay ? 40_000 : 60_000,
-      retryDelayMs: miniPay ? 5_000 : 2_000,
-      fetchTimeoutMs: miniPay ? 18_000 : 12_000,
-      onProgress: ({ attempt, maxAttempts }) => {
+    const result = await pollRefillUntilConfirmed(txHash, token, {
+      payerWallet,
+      maxWallMs: 180_000,
+      retryDelayMs: 5_000,
+      fetchTimeoutMs: 22_000,
+      onProgress: ({ attempt }) => {
         setRefillStatus(
-          t.challenge.confirmingPaymentProgress
-            .replace("{n}", String(attempt))
-            .replace("{max}", String(maxAttempts))
+          t.challenge.verifyingPaymentProgress.replace("{n}", String(attempt))
         );
       },
     });
 
-    if (!result.ok) {
-      setRefillStep("idle");
-      setRefillStatus(null);
-      setRefillError(formatRefillError(null, result.error));
-      return false;
+    if (result.outcome === "confirmed") {
+      setRefillStep("success");
+      setRefillStatus(t.challenge.lifeRestored);
+      await new Promise((r) => setTimeout(r, 1100));
+      applyRefillSuccess(result.data);
+      void syncProgress();
+      return "confirmed";
     }
 
-    setRefillStep("success");
-    setRefillStatus(t.challenge.lifeRestored);
-    await new Promise((r) => setTimeout(r, 1100));
-    applyRefillSuccess(result.data);
-    void syncProgress();
-    return true;
+    if (result.outcome === "pending") {
+      setRefillStep("verifying");
+      setRefillStatus(t.challenge.verifyingPayment);
+      setRefillError(null);
+      return "pending";
+    }
+
+    setRefillStep("idle");
+    setRefillStatus(null);
+    setRefillError(formatRefillError(null, result.error));
+    return "failed";
   }
 
   async function handleRetryVerify() {
@@ -363,13 +370,89 @@ export default function ChallengePage() {
     if (!pending || refilling) return;
     setRefilling(true);
     setRefillError(null);
-    setRefillStep("confirming");
     try {
-      await confirmRefillOnServer(pending.txHash, pending.token);
+      await confirmRefillOnServer(
+        pending.txHash,
+        pending.token,
+        sessionWallet ?? undefined
+      );
     } finally {
       setRefilling(false);
     }
   }
+
+  useEffect(() => {
+    if (!awaitingRefill || refilling) return;
+    const pending = readPendingRefill();
+    if (!pending) return;
+
+    let cancelled = false;
+    setRefilling(true);
+    setRefillStep("verifying");
+    setRefillStatus(t.challenge.verifyingPayment);
+
+    void (async () => {
+      const recovered = await tryRecoverRefillStateFromServer();
+      if (cancelled) return;
+      if (recovered) {
+        setRefillStep("success");
+        applyRefillSuccess(recovered);
+        setRefilling(false);
+        return;
+      }
+
+      const outcome = await confirmRefillOnServer(
+        pending.txHash,
+        pending.token,
+        sessionWallet ?? undefined
+      );
+      if (!cancelled) setRefilling(false);
+      if (!cancelled && outcome === "pending") {
+        setRefillStep("verifying");
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- resume pending tx once
+  }, [awaitingRefill]);
+
+  useEffect(() => {
+    if (!awaitingRefill || refilling) return;
+    if (refillStep !== "verifying") return;
+    const pending = readPendingRefill();
+    if (!pending) return;
+
+    const interval = window.setInterval(() => {
+      void (async () => {
+        const recovered = await tryRecoverRefillStateFromServer();
+        if (recovered) {
+          setRefillStep("success");
+          applyRefillSuccess(recovered);
+          return;
+        }
+        const result = await pollRefillUntilConfirmed(
+          pending.txHash,
+          pending.token,
+          {
+            payerWallet: sessionWallet ?? undefined,
+            maxWallMs: 25_000,
+            retryDelayMs: 4_000,
+            fetchTimeoutMs: 22_000,
+          }
+        );
+        if (result.outcome === "confirmed") {
+          setRefillStep("success");
+          setRefillStatus(t.challenge.lifeRestored);
+          applyRefillSuccess(result.data);
+        }
+      })();
+    }, 20_000);
+
+    return () => window.clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- background sync while verifying
+  }, [awaitingRefill, refilling, refillStep, sessionWallet]);
 
   useEffect(() => {
     setLoading(true);
@@ -511,7 +594,9 @@ export default function ChallengePage() {
     }
     if (apiError === "TX_FAILED") return t.challenge.refillTxFailed;
     if (apiError === "TX_NOT_FOUND") return t.challenge.refillTxNotFound;
-    if (apiError === "VERIFY_TIMEOUT") return t.challenge.refillVerifyTimeout;
+    if (apiError === "VERIFY_TIMEOUT" || apiError === "PAYMENT_PENDING") {
+      return t.challenge.verifyingPayment;
+    }
     if (apiError === "WALLET_MISMATCH") return t.challenge.walletMismatch;
     if (apiError === "PAYMENT_NOT_CONFIGURED") {
       return t.challenge.refillPaymentNotConfigured;
@@ -679,7 +764,16 @@ export default function ChallengePage() {
       );
 
       savePendingRefill({ txHash, token: paidToken });
-      await confirmRefillOnServer(txHash, paidToken);
+      setRefillStep("verifying");
+      setRefillStatus(t.challenge.verifyingPayment);
+      const outcome = await confirmRefillOnServer(
+        txHash,
+        paidToken,
+        payerWallet ?? undefined
+      );
+      if (outcome === "pending") {
+        setRefillError(null);
+      }
     } catch (err) {
       setRefillStep("idle");
       setRefillStatus(null);
@@ -814,14 +908,17 @@ export default function ChallengePage() {
             payWithTokenLabel={t.challenge.payWithToken}
             selectTokenLabel={t.challenge.selectPaymentToken}
             processingLabel={t.challenge.processingPayment}
-            confirmingLabel={t.challenge.confirmingPayment}
+            confirmingLabel={t.challenge.verifyingPayment}
             confirmingHint={t.challenge.confirmingPaymentHint}
             lifeRestoredLabel={t.challenge.lifeRestored}
             openingWalletLabel={t.challenge.openingWallet}
             waitLabel={t.challenge.waitForReset}
             onRefill={handleRefill}
             onRetryVerify={handleRetryVerify}
-            showRetryVerify={!!readPendingRefill() && !!refillError}
+            showRetryVerify={
+              (!!readPendingRefill() && refillStep === "verifying") ||
+              (!!readPendingRefill() && !!refillError)
+            }
             retryVerifyLabel={t.challenge.retryVerifyPayment}
             onForfeit={handleForfeit}
             submitting={submitting}
@@ -1387,7 +1484,7 @@ function RefillScreen({
   hideTokenPicker?: boolean;
   minipayHint?: string;
 }) {
-  const isConfirming = refillStep === "confirming" || refillStep === "wallet";
+  const isVerifying = refillStep === "verifying" || refillStep === "wallet";
   const isSuccess = refillStep === "success";
 
   return (
@@ -1402,7 +1499,7 @@ function RefillScreen({
         >
           {isSuccess ? (
             <CheckCircle2 className="size-12 text-prosperity" />
-          ) : isConfirming ? (
+          ) : isVerifying ? (
             <Loader2 className="size-12 animate-spin text-prosperity" />
           ) : (
             <HeartCrack className="size-12 text-danger" />
@@ -1435,7 +1532,7 @@ function RefillScreen({
       </div>
 
       <div className="flex flex-col gap-3 animate-card-pop">
-        {isConfirming || isSuccess ? (
+        {isVerifying || isSuccess ? (
           <div className="rounded-2xl bg-surface p-6 ring-1 ring-prosperity/30 card-depth-sm text-center">
             <p className="text-sm font-bold text-prosperity">
               {isSuccess
@@ -1446,7 +1543,9 @@ function RefillScreen({
             </p>
             {!isSuccess && (
               <p className="mt-2 text-xs font-medium leading-relaxed text-h-muted">
-                {confirmingHint}
+                {refillStep === "verifying"
+                  ? confirmingHint
+                  : confirmingHint}
               </p>
             )}
             {refillStatus && (
@@ -1498,13 +1597,13 @@ function RefillScreen({
             </div>
           )}
 
-          {refillError && !isConfirming && !isSuccess && (
+          {refillError && !isVerifying && !isSuccess && (
             <p className="animate-shake mt-2 text-center text-xs font-bold text-danger">
               {refillError}
             </p>
           )}
 
-          {showRetryVerify && onRetryVerify && retryVerifyLabel && !isConfirming && !isSuccess && (
+          {showRetryVerify && onRetryVerify && retryVerifyLabel && !isSuccess && (
             <button
               type="button"
               onClick={onRetryVerify}

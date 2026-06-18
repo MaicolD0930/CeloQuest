@@ -27,7 +27,6 @@ export function readPendingRefill(): PendingRefill | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as PendingRefill;
     if (!parsed?.txHash || !parsed?.token) return null;
-    // Drop stale entries after 2 hours.
     if (Date.now() - (parsed.savedAt ?? 0) > 2 * 60 * 60 * 1000) {
       clearPendingRefill();
       return null;
@@ -53,21 +52,39 @@ export type RefillApiSuccess = {
   activeDurationMs?: number;
 };
 
-export type RefillProgress = {
+export type RefillPollProgress = {
   attempt: number;
-  maxAttempts: number;
 };
 
 export type RefillPollOptions = {
   maxWallMs?: number;
   retryDelayMs?: number;
   fetchTimeoutMs?: number;
-  /** Poll /today less often — MiniPay webview struggles with many parallel fetches. */
-  lightMode?: boolean;
-  onProgress?: (progress: RefillProgress) => void;
+  payerWallet?: string;
+  onProgress?: (progress: RefillPollProgress) => void;
 };
 
-/** If refill already applied server-side, sync client state without another payment. */
+type RefillApiBody = {
+  status?: string;
+  reason?: string;
+  error?: string;
+  livesLeft?: number;
+  startedAt?: string;
+  activeDurationMs?: number;
+};
+
+const DEFINITIVE_FAILURES = new Set([
+  "TX_FAILED",
+  "WALLET_MISMATCH",
+  "TX_ALREADY_USED",
+  "REFILL_ALREADY_USED",
+  "PAYMENT_NOT_CONFIGURED",
+  "Challenge not started",
+  "Challenge already completed",
+  "Refill not available",
+]);
+
+/** If life was restored server-side, sync without another payment. */
 export async function tryRecoverRefillStateFromServer(): Promise<RefillApiSuccess | null> {
   try {
     const res = await fetch("/api/challenge/today", { credentials: "include" });
@@ -93,100 +110,162 @@ export async function tryRecoverRefillStateFromServer(): Promise<RefillApiSucces
   return null;
 }
 
-export async function postRefillUntilConfirmed(
+async function requestRefillOnce(
+  txHash: string,
+  token: RecoveryTokenId,
+  fetchTimeoutMs: number,
+  method: "POST" | "GET" = "POST",
+  payerWallet?: string
+): Promise<RefillApiBody & { httpStatus: number }> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), fetchTimeoutMs);
+
+  try {
+    const url =
+      method === "GET"
+        ? `/api/challenge/refill/status?txHash=${encodeURIComponent(txHash)}&token=${encodeURIComponent(token)}`
+        : "/api/challenge/refill";
+
+    const res = await fetch(url, {
+      method,
+      credentials: "include",
+      headers: method === "POST" ? { "Content-Type": "application/json" } : undefined,
+      body:
+        method === "POST"
+          ? JSON.stringify({ txHash, token, payerWallet })
+          : undefined,
+      signal: controller.signal,
+    });
+
+    const body = (await res.json().catch(() => ({}))) as RefillApiBody;
+    return { ...body, httpStatus: res.status };
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      return { status: "pending", reason: "REQUEST_TIMEOUT", httpStatus: 202 };
+    }
+    return { status: "pending", reason: "NETWORK_ERROR", httpStatus: 202 };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function parseRefillResponse(
+  body: RefillApiBody & { httpStatus?: number }
+): { outcome: "confirmed"; data: RefillApiSuccess } | { outcome: "pending"; reason: string } | { outcome: "failed"; error: string } {
+  if (
+    body.status === "confirmed" ||
+    (body.httpStatus === 200 && typeof body.livesLeft === "number")
+  ) {
+    clearPendingRefill();
+    return {
+      outcome: "confirmed",
+      data: {
+        livesLeft: body.livesLeft ?? 1,
+        startedAt:
+          typeof body.startedAt === "string"
+            ? body.startedAt
+            : body.startedAt != null
+              ? String(body.startedAt)
+              : undefined,
+        activeDurationMs: body.activeDurationMs,
+      },
+    };
+  }
+
+  const reason = body.reason ?? body.error ?? "TX_NOT_FOUND";
+
+  if (body.status === "pending" || body.httpStatus === 202) {
+    return { outcome: "pending", reason };
+  }
+
+  if (DEFINITIVE_FAILURES.has(reason)) {
+    return { outcome: "failed", error: reason };
+  }
+
+  if (body.status === "failed") {
+    return { outcome: "failed", error: reason };
+  }
+
+  return { outcome: "pending", reason };
+}
+
+/**
+ * Poll backend until payment is confirmed on-chain and life is granted.
+ * Never treats slow indexing as a hard error — returns pending instead.
+ */
+export async function pollRefillUntilConfirmed(
   txHash: string,
   token: RecoveryTokenId,
   options?: RefillPollOptions
-): Promise<{ ok: true; data: RefillApiSuccess } | { ok: false; error?: string }> {
-  const light = options?.lightMode ?? false;
-  const maxWallMs = options?.maxWallMs ?? (light ? 40_000 : 90_000);
-  const retryDelayMs = options?.retryDelayMs ?? (light ? 5_000 : 2_000);
-  const fetchTimeoutMs = options?.fetchTimeoutMs ?? (light ? 18_000 : 12_000);
+): Promise<
+  | { outcome: "confirmed"; data: RefillApiSuccess }
+  | { outcome: "pending"; reason: string }
+  | { outcome: "failed"; error: string }
+> {
+  const maxWallMs = options?.maxWallMs ?? 180_000;
+  const retryDelayMs = options?.retryDelayMs ?? 5_000;
+  const fetchTimeoutMs = options?.fetchTimeoutMs ?? 20_000;
   const deadline = Date.now() + maxWallMs;
-  const maxAttempts = Math.max(1, Math.ceil(maxWallMs / retryDelayMs));
 
-  let lastError: string | undefined;
   let attempt = 0;
+  let lastReason = "TX_NOT_FOUND";
 
   while (Date.now() < deadline) {
     attempt += 1;
-    options?.onProgress?.({ attempt, maxAttempts });
+    options?.onProgress?.({ attempt });
 
-    if (!light || attempt === 1 || attempt % 4 === 0) {
-      const recovered = await tryRecoverRefillStateFromServer();
-      if (recovered) return { ok: true, data: recovered };
+    const recovered = await tryRecoverRefillStateFromServer();
+    if (recovered) {
+      return { outcome: "confirmed", data: recovered };
     }
 
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), fetchTimeoutMs);
+    const useGet = attempt > 1;
+    const body = await requestRefillOnce(
+      txHash,
+      token,
+      fetchTimeoutMs,
+      useGet ? "GET" : "POST",
+      options?.payerWallet
+    );
+    const parsed = parseRefillResponse(body);
 
-    try {
-      const res = await fetch("/api/challenge/refill", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ txHash, token }),
-        signal: controller.signal,
-      });
+    if (parsed.outcome === "confirmed") return parsed;
+    if (parsed.outcome === "failed") return parsed;
 
-      if (res.ok) {
-        const data = (await res.json()) as RefillApiSuccess;
-        clearPendingRefill();
-        return { ok: true, data };
-      }
-
-      try {
-        const body = await res.json();
-        lastError = typeof body.error === "string" ? body.error : undefined;
-      } catch {
-        lastError = `HTTP_${res.status}`;
-      }
-
-      if (lastError === "REFILL_ALREADY_USED") {
-        const recoveredAfterUsed = await tryRecoverRefillStateFromServer();
-        if (recoveredAfterUsed) return { ok: true, data: recoveredAfterUsed };
-        return { ok: false, error: lastError };
-      }
-
-      if (lastError === "TX_ALREADY_USED" || lastError === "WALLET_MISMATCH") {
-        return { ok: false, error: lastError };
-      }
-
-      if (!shouldRetryRefill(lastError, res.status)) {
-        return { ok: false, error: lastError };
-      }
-    } catch (err) {
-      if (err instanceof Error && err.name === "AbortError") {
-        lastError = "REQUEST_TIMEOUT";
-      } else {
-        lastError = "NETWORK_ERROR";
-      }
-    } finally {
-      clearTimeout(timer);
-    }
+    lastReason = parsed.reason;
 
     if (Date.now() + retryDelayMs >= deadline) break;
     await new Promise((r) => setTimeout(r, retryDelayMs));
   }
 
   const recovered = await tryRecoverRefillStateFromServer();
-  if (recovered) return { ok: true, data: recovered };
+  if (recovered) {
+    return { outcome: "confirmed", data: recovered };
+  }
 
-  return { ok: false, error: lastError ?? "VERIFY_TIMEOUT" };
+  return { outcome: "pending", reason: lastReason };
 }
 
-function shouldRetryRefill(error: string | undefined, status: number): boolean {
-  if (!error) return true;
-  if (
-    error === "TX_NOT_FOUND" ||
-    error === "INVALID_PAYMENT" ||
-    error === "REQUEST_TIMEOUT" ||
-    error === "NETWORK_ERROR" ||
-    error === "SERVER_ERROR"
-  ) {
-    return true;
+/** @deprecated Use pollRefillUntilConfirmed */
+export async function postRefillUntilConfirmed(
+  txHash: string,
+  token: RecoveryTokenId,
+  options?: RefillPollOptions & { lightMode?: boolean }
+): Promise<{ ok: true; data: RefillApiSuccess } | { ok: false; error?: string }> {
+  const result = await pollRefillUntilConfirmed(txHash, token, {
+    maxWallMs: options?.lightMode ? 120_000 : options?.maxWallMs,
+    retryDelayMs: options?.retryDelayMs,
+    fetchTimeoutMs: options?.fetchTimeoutMs,
+    onProgress: options?.onProgress
+      ? (p) => options.onProgress?.({ attempt: p.attempt })
+      : undefined,
+  });
+
+  if (result.outcome === "confirmed") {
+    return { ok: true, data: result.data };
   }
-  if (error.startsWith("HTTP_5")) return true;
-  if (status >= 500) return true;
-  return false;
+  if (result.outcome === "failed") {
+    return { ok: false, error: result.error };
+  }
+  return { ok: false, error: "PAYMENT_PENDING" };
 }
