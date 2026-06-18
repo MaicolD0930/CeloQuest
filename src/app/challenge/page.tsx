@@ -53,6 +53,8 @@ import {
   savePreferredWalletProvider,
   type WalletProviderId,
 } from "@/lib/wallet-providers";
+import { isApiClientError } from "@/lib/client/api-fetch";
+import { formatApiErrorMessage } from "@/lib/client/format-api-error";
 import { LIVES_PER_DAY } from "@/lib/game";
 
 type Question = {
@@ -214,12 +216,13 @@ export default function ChallengePage() {
       const data = await fetchChallengeToday(locale, { force });
       await applyChallengeData(data);
     } catch (e) {
-      const err = e as Error & { status?: number };
-      if (err.status === 401) {
+      if (isApiClientError(e) && e.kind === "UNAUTHORIZED") {
         window.location.assign("/connect");
         return;
       }
-      setLoadError(t.common.error);
+      setLoadError(
+        formatApiErrorMessage(e, t.apiErrors, { showDebug: miniPay })
+      );
     }
   }
 

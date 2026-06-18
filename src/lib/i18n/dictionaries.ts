@@ -459,6 +459,23 @@ const es = {
     retry: "Reintentar",
     language: "Idioma",
   },
+  apiErrors: {
+    timeout:
+      "Tiempo de espera agotado. El servidor tardó demasiado en responder.",
+    network:
+      "Sin conexión al servidor. Revisa tu internet o inténtalo en unos minutos.",
+    cors:
+      "Bloqueo de red (posible CORS). La app no pudo leer la respuesta del API.",
+    apiDown:
+      "El API no está disponible (error 502/503). Vercel o el servidor pueden estar caídos.",
+    database:
+      "Error de base de datos. El servidor no pudo leer o escribir datos.",
+    invalidResponse:
+      "Respuesta inválida del servidor (no es JSON o formato inesperado).",
+    http: "Error del servidor (HTTP {status}).",
+    unauthorized: "Sesión expirada. Vuelve a conectar tu wallet.",
+    unknown: "Error de comunicación con el servidor.",
+  },
   weeklyPrize: {
     badge: "Premio semanal",
     title: "{amount} USDC",
@@ -931,6 +948,21 @@ const en: Dict = {
     error: "Something went wrong",
     retry: "Retry",
     language: "Language",
+  },
+  apiErrors: {
+    timeout: "Request timed out. The server took too long to respond.",
+    network:
+      "No connection to the server. Check your internet or try again shortly.",
+    cors:
+      "Network block (possible CORS). The app could not read the API response.",
+    apiDown:
+      "API unavailable (502/503). Vercel or the server may be down.",
+    database: "Database error. The server could not read or write data.",
+    invalidResponse:
+      "Invalid server response (not JSON or unexpected format).",
+    http: "Server error (HTTP {status}).",
+    unauthorized: "Session expired. Please connect your wallet again.",
+    unknown: "Communication error with the server.",
   },
   weeklyPrize: {
     badge: "Weekly prize",

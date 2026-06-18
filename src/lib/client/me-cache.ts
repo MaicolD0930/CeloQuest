@@ -1,3 +1,5 @@
+import { apiFetchJson } from "@/lib/client/api-fetch";
+
 /** Short-lived client cache for GET /api/users/me (profile reads only). */
 export const ME_CACHE_TTL_MS = 45_000;
 
@@ -67,17 +69,12 @@ export async function fetchMe(options?: {
     return inflight;
   }
 
-  inflight = fetch("/api/users/me", { credentials: "include" })
-    .then(async (res) => {
-      if (res.status === 401) {
-        const err = new Error("UNAUTHORIZED") as Error & { status?: number };
-        err.status = 401;
-        throw err;
-      }
-      if (!res.ok) {
-        throw new Error("ME_FETCH_FAILED");
-      }
-      const data = (await res.json()) as MeResponse;
+  inflight = apiFetchJson<MeResponse>("/api/users/me", {
+    credentials: "include",
+    label: "GET /api/users/me",
+    timeoutMs: 25_000,
+  })
+    .then(({ data }) => {
       cache = { data, fetchedAt: Date.now() };
       return data;
     })

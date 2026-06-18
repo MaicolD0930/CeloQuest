@@ -21,6 +21,8 @@ import {
   type WalletProviderId,
 } from "@/lib/wallet-providers";
 import { USERNAME_MAX } from "@/lib/username";
+import { apiFetchJson, isApiClientError } from "@/lib/client/api-fetch";
+import { formatApiErrorMessage } from "@/lib/client/format-api-error";
 import { useIsMiniPay } from "@/hooks/useIsMiniPay";
 
 const AVATARS = ["🦊", "🐸", "🦁", "🐼", "🦄", "🐙", "🦉", "🐢"];
@@ -85,43 +87,49 @@ export default function ConnectPage() {
         return t.connect.walletRequired;
       case "SERVER_ERROR":
         return t.connect.serverError;
+      case "DATABASE_ERROR":
+        return t.apiErrors.database;
       default:
         return t.connect.errorGeneric;
     }
   }
 
   async function loginWithWallet(address: string) {
-    const res = await fetch("/api/users", {
-      ...FETCH_OPTS,
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ walletAddress: address }),
-    });
-
-    let data: Record<string, unknown> = {};
     try {
-      data = await res.json();
-    } catch {
-      data = {};
-    }
+      const { data } = await apiFetchJson<Record<string, unknown>>("/api/users", {
+        ...FETCH_OPTS,
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ walletAddress: address }),
+        label: "POST /api/users",
+        timeoutMs: 28_000,
+      });
 
-    if (res.ok && data.returning) {
-      goHome();
-      return "returning" as const;
-    }
-    if (res.ok && data.needsProfile) {
+      if (data.returning) {
+        goHome();
+        return "returning" as const;
+      }
+      if (data.needsProfile) {
+        setNeedsProfile(true);
+        return "needsProfile" as const;
+      }
+
       setNeedsProfile(true);
       return "needsProfile" as const;
-    }
-
-    if (!res.ok) {
-      const code = typeof data.error === "string" ? data.error : "UNKNOWN";
-      setError(usernameErrorMessage(code));
+    } catch (err) {
+      if (isApiClientError(err)) {
+        if (err.code) {
+          setError(usernameErrorMessage(err.code));
+          return "error" as const;
+        }
+        setError(
+          formatApiErrorMessage(err, t.apiErrors, { showDebug: miniPay })
+        );
+        return "error" as const;
+      }
+      setError(t.connect.serverError);
       return "error" as const;
     }
-
-    setNeedsProfile(true);
-    return "needsProfile" as const;
   }
 
   function walletErrorMessage(err: unknown): string {
@@ -168,15 +176,20 @@ export default function ConnectPage() {
       setWalletAddress(address);
 
       try {
-        await loginWithWallet(address);
-      } catch {
+        const result = await loginWithWallet(address);
+        if (result === "error") return;
+      } catch (err) {
         setNeedsProfile(true);
-        setError(t.connect.errorGeneric);
+        setError(
+          formatApiErrorMessage(err, t.apiErrors, { showDebug: miniPay })
+        );
       }
     } catch (err) {
       if (connectedAddress) {
         setNeedsProfile(true);
-        setError(t.connect.errorGeneric);
+        setError(
+          formatApiErrorMessage(err, t.apiErrors, { showDebug: miniPay })
+        );
       } else {
         setError(walletErrorMessage(err));
       }
@@ -198,9 +211,10 @@ export default function ConnectPage() {
     setError(null);
     setConnecting(true);
     try {
-      await loginWithWallet(walletAddress);
-    } catch {
-      setError(t.connect.errorGeneric);
+      const result = await loginWithWallet(walletAddress);
+      if (result === "error") return;
+    } catch (err) {
+      setError(formatApiErrorMessage(err, t.apiErrors, { showDebug: miniPay }));
     } finally {
       setConnecting(false);
     }
@@ -214,7 +228,7 @@ export default function ConnectPage() {
     }
     setCreating(true);
     try {
-      const res = await fetch("/api/users", {
+      await apiFetchJson("/api/users", {
         ...FETCH_OPTS,
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -224,16 +238,18 @@ export default function ConnectPage() {
           locale,
           walletAddress,
         }),
+        label: "POST /api/users (create profile)",
+        timeoutMs: 28_000,
       });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(usernameErrorMessage(data.error ?? "UNKNOWN"));
-        setCreating(false);
-        return;
-      }
       goHome();
-    } catch {
-      setError(t.connect.errorGeneric);
+    } catch (err) {
+      if (isApiClientError(err) && err.code) {
+        setError(usernameErrorMessage(err.code));
+      } else {
+        setError(
+          formatApiErrorMessage(err, t.apiErrors, { showDebug: miniPay })
+        );
+      }
       setCreating(false);
     }
   }

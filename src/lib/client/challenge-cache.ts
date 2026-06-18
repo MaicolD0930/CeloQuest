@@ -1,4 +1,5 @@
 import type { Locale } from "@/lib/i18n/dictionaries";
+import { apiFetchJson } from "@/lib/client/api-fetch";
 
 export const CHALLENGE_CACHE_TTL_MS = 20_000;
 
@@ -67,17 +68,14 @@ export async function fetchChallengeToday(
     return inflight;
   }
 
-  inflight = fetch(`/api/challenge/today?locale=${locale}`, {
+  const url = `/api/challenge/today?locale=${locale}`;
+
+  inflight = apiFetchJson<ChallengeTodayResponse>(url, {
     credentials: "include",
+    label: `GET ${url}`,
+    timeoutMs: 28_000,
   })
-    .then(async (res) => {
-      if (res.status === 401) {
-        const err = new Error("UNAUTHORIZED") as Error & { status?: number };
-        err.status = 401;
-        throw err;
-      }
-      if (!res.ok) throw new Error("CHALLENGE_FETCH_FAILED");
-      const data = (await res.json()) as ChallengeTodayResponse;
+    .then(({ data }) => {
       cache = { key, data, fetchedAt: Date.now() };
       return data;
     })

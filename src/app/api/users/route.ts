@@ -7,6 +7,7 @@ import {
   normalizeUsername,
   validateUsernameFormat,
 } from "@/lib/username";
+import { apiServerErrorResponse } from "@/lib/api/server-error";
 import {
   findUserByWallet,
   normalizeWalletAddress,
@@ -92,8 +93,7 @@ export async function POST(req: NextRequest) {
     setUserCookie(res, user.id);
     return res;
   } catch (e) {
-    console.error("POST /api/users error:", e);
-    return NextResponse.json({ error: "SERVER_ERROR" }, { status: 500 });
+    return apiServerErrorResponse("POST /api/users", e);
   }
 }
 

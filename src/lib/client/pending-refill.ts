@@ -1,4 +1,5 @@
 import type { RecoveryTokenId } from "@/lib/tokens/recovery";
+import { apiFetch, apiFetchJson, isApiClientError } from "@/lib/client/api-fetch";
 
 const STORAGE_KEY = "celoquest-pending-refill";
 
@@ -87,9 +88,16 @@ const DEFINITIVE_FAILURES = new Set([
 /** If life was restored server-side, sync without another payment. */
 export async function tryRecoverRefillStateFromServer(): Promise<RefillApiSuccess | null> {
   try {
-    const res = await fetch("/api/challenge/today", { credentials: "include" });
-    if (!res.ok) return null;
-    const data = await res.json();
+    const { data } = await apiFetchJson<{ progress?: {
+      awaitingRefill?: boolean;
+      livesLeft?: number;
+      startedAt?: string;
+      activeDurationMs?: number;
+    } }>("/api/challenge/today", {
+      credentials: "include",
+      label: "GET /api/challenge/today (recover)",
+      timeoutMs: 20_000,
+    });
     const progress = data?.progress;
     if (
       progress &&
@@ -104,8 +112,10 @@ export async function tryRecoverRefillStateFromServer(): Promise<RefillApiSucces
         activeDurationMs: progress.activeDurationMs,
       };
     }
-  } catch {
-    /* ignore */
+  } catch (err) {
+    if (isApiClientError(err)) {
+      console.warn("[CeloQuest refill] recover:", err.kind, err.status);
+    }
   }
   return null;
 }
@@ -117,16 +127,13 @@ async function requestRefillOnce(
   method: "POST" | "GET" = "POST",
   payerWallet?: string
 ): Promise<RefillApiBody & { httpStatus: number }> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), fetchTimeoutMs);
+  const url =
+    method === "GET"
+      ? `/api/challenge/refill/status?txHash=${encodeURIComponent(txHash)}&token=${encodeURIComponent(token)}`
+      : "/api/challenge/refill";
 
   try {
-    const url =
-      method === "GET"
-        ? `/api/challenge/refill/status?txHash=${encodeURIComponent(txHash)}&token=${encodeURIComponent(token)}`
-        : "/api/challenge/refill";
-
-    const res = await fetch(url, {
+    const { response, data } = await apiFetch(url, {
       method,
       credentials: "include",
       headers: method === "POST" ? { "Content-Type": "application/json" } : undefined,
@@ -134,18 +141,24 @@ async function requestRefillOnce(
         method === "POST"
           ? JSON.stringify({ txHash, token, payerWallet })
           : undefined,
-      signal: controller.signal,
+      label: `${method} ${url}`,
+      timeoutMs: fetchTimeoutMs,
+      throwOnHttpError: false,
     });
-
-    const body = (await res.json().catch(() => ({}))) as RefillApiBody;
-    return { ...body, httpStatus: res.status };
+    return { ...(data as RefillApiBody), httpStatus: response.status };
   } catch (err) {
-    if (err instanceof Error && err.name === "AbortError") {
-      return { status: "pending", reason: "REQUEST_TIMEOUT", httpStatus: 202 };
+    if (isApiClientError(err)) {
+      if (err.kind === "TIMEOUT") {
+        return { status: "pending", reason: "REQUEST_TIMEOUT", httpStatus: 202 };
+      }
+      console.warn("[CeloQuest refill] request:", err.kind, err.url, err.status);
+      return {
+        status: "pending",
+        reason: err.kind === "DATABASE" ? "SERVER_ERROR" : "NETWORK_ERROR",
+        httpStatus: 202,
+      };
     }
     return { status: "pending", reason: "NETWORK_ERROR", httpStatus: 202 };
-  } finally {
-    clearTimeout(timer);
   }
 }
 
