@@ -85,13 +85,16 @@ NEXT_PUBLIC_RECOVERY_DEMO_MODE=false
 
 ### Demo en Vercel (repetir reto del día)
 
-Solo para presentaciones, añade en **Environment Variables → Production**:
+En **Sepolia** los reintentos del mismo día vienen **activados por defecto** (modo demo/QA).
+
+Opcional en **Environment Variables → Production**:
 
 ```env
-ALLOW_DAILY_CHALLENGE_RETRY=true
+ALLOW_DAILY_CHALLENGE_RETRY=true   # forzar también en mainnet
+ALLOW_DAILY_CHALLENGE_RETRY=false  # un intento/día en Sepolia
 ```
 
-Luego **Redeploy**. Permite volver a jugar el reto del mismo día sin esperar al reinicio. Quítala cuando la app esté abierta al público.
+Luego **Redeploy** si cambias estas variables.
 
 ### URL de la app
 
