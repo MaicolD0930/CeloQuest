@@ -26,16 +26,12 @@ import {
 } from "@/lib/tokens/tcopm";
 import {
   discoverWalletProviders,
+  assertMiniPayOnAppChain,
   ensureCorrectChain,
   hasAnyWalletInstalled,
   resolveWalletProvider,
   type WalletProviderId,
 } from "@/lib/wallet-providers";
-import {
-  assertMiniPayServerNetwork,
-  initMiniPayConnect,
-  loadClientChainConfig,
-} from "@/lib/chain/app-config-client";
 import {
   encodePurchaseRecovery,
   type PreparedRecoveryPayment,
@@ -206,21 +202,16 @@ export async function connectWallet(providerId?: WalletProviderId): Promise<stri
   const provider = resolveWalletProvider(providerId);
   const miniPayConnect = isMiniPayPayment(providerId);
 
-  // MiniPay: obtain account first — do not wait on /api/app-config (can hang or fail in WebView).
+  if (!miniPayConnect) {
+    await ensureCorrectChain(provider);
+  }
+
   const client = createWalletClient({
     chain: getActiveChain(),
     transport: custom(provider),
   });
   const [address] = await client.requestAddresses();
   if (!address) throw new Error("NO_ACCOUNT");
-
-  if (miniPayConnect) {
-    initMiniPayConnect(provider);
-  } else {
-    void loadClientChainConfig().catch(() => {});
-    await ensureCorrectChain(provider);
-  }
-
   return address;
 }
 
@@ -448,7 +439,7 @@ export async function sendRecoveryPayment(
   }
 
   if (miniPayPay) {
-    await assertMiniPayServerNetwork(provider);
+    await assertMiniPayOnAppChain(provider);
     const hash = await sendMiniPayDirectTransfer(
       provider,
       account,

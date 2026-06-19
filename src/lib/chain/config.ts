@@ -3,30 +3,13 @@ import type { Chain } from "viem";
 
 export type CeloNetwork = "sepolia" | "mainnet";
 
-let clientNetworkOverride: CeloNetwork | null = null;
-
-/** Set after /api/app-config loads on the client. */
-export function setClientNetworkOverride(network: CeloNetwork): void {
-  clientNetworkOverride = network;
-}
-
-function resolveNetworkFromEnv(): CeloNetwork {
-  const isServer = typeof window === "undefined";
-  // Server: only CELO_NETWORK (runtime). Ignore NEXT_PUBLIC baked at build time.
-  const raw = isServer
-    ? (process.env.CELO_NETWORK ??
-        (process.env.NODE_ENV === "production" ? "mainnet" : "sepolia"))
-    : (process.env.NEXT_PUBLIC_CELO_NETWORK ??
-        process.env.CELO_NETWORK ??
-        (process.env.NODE_ENV === "production" ? "mainnet" : "sepolia"));
-  return raw.toLowerCase() === "mainnet" ? "mainnet" : "sepolia";
-}
-
 export function getCeloNetwork(): CeloNetwork {
-  if (typeof window !== "undefined" && clientNetworkOverride) {
-    return clientNetworkOverride;
-  }
-  return resolveNetworkFromEnv();
+  const network = (
+    process.env.NEXT_PUBLIC_CELO_NETWORK ??
+    process.env.CELO_NETWORK ??
+    (process.env.NODE_ENV === "production" ? "mainnet" : "sepolia")
+  ).toLowerCase();
+  return network === "mainnet" ? "mainnet" : "sepolia";
 }
 
 export function getActiveChain(): Chain {

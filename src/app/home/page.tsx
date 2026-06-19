@@ -25,7 +25,6 @@ import { AppVersionBadge } from "@/components/AppVersionBadge";
 import { ChallengeCompletedCard } from "@/components/ChallengeCompletedCard";
 import { useMe } from "@/hooks/useMe";
 import { prefetchChallengeToday } from "@/lib/client/challenge-cache";
-import { useAppChainConfig } from "@/hooks/useAppChainConfig";
 
 type WalletBalanceCell = {
   configured: boolean;
@@ -47,16 +46,8 @@ export default function HomePage() {
   });
   const [balances, setBalances] = useState<BalancesResponse | null>(null);
   const [balancesLoading, setBalancesLoading] = useState(false);
-  const chainConfig = useAppChainConfig();
-  const copmToken = chainConfig?.tokens.copm
-    ? {
-        symbol: chainConfig.tokens.copm.symbol,
-        id: chainConfig.tokens.copm.id,
-      }
-    : getCopmTokenConfig();
-  const usdcToken = chainConfig?.tokens.usdc
-    ? { symbol: chainConfig.tokens.usdc.symbol }
-    : getUsdcTokenConfig();
+  const copmToken = getCopmTokenConfig();
+  const usdcToken = getUsdcTokenConfig();
 
   useEffect(() => {
     if (!data?.today.completed) {
@@ -102,7 +93,7 @@ export default function HomePage() {
     return () => {
       cancelled = true;
     };
-  }, [data?.user.walletAddress, chainConfig?.network, copmToken.symbol, usdcToken.symbol]);
+  }, [data?.user.walletAddress, copmToken.symbol, usdcToken.symbol]);
 
   if (loading || !data) {
     return (
@@ -270,11 +261,11 @@ export default function HomePage() {
 
         <WalletBalancesRow
           tcopm={{
-            label: `${t.home.balancePrefix} ${copmToken.symbol}`,
-            symbol: copmToken.symbol,
+            label: `${t.home.balancePrefix} ${balances?.tcopm.symbol ?? copmToken.symbol}`,
+            symbol: balances?.tcopm.symbol ?? copmToken.symbol,
             balance:
               balances && !balances.tcopm.error
-                ? `${balances.tcopm.display} ${copmToken.symbol}`
+                ? `${balances.tcopm.display} ${balances.tcopm.symbol ?? copmToken.symbol}`
                 : null,
             loading: balancesLoading,
             error: balances?.tcopm.error ?? false,
