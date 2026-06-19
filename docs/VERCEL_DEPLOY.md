@@ -1,12 +1,12 @@
 # Despliegue en Vercel (CeloQuest)
 
-Guía para dejar la app al **~90% lista** en producción (testnet Sepolia). Tras el primer deploy solo quedan pasos cortos: URL pública, seed, NFT metadata y `setBaseURI`.
+Guía para producción en **Celo Mainnet** (USDC + cCOP).
 
 ## Requisitos previos
 
 - Repo en GitHub: `MaicolD0930/CeloQuest` (raíz = carpeta `celoquest`)
 - Proyecto Supabase con PostgreSQL
-- Contratos ya desplegados en Celo Sepolia (tCOPM, recovery, rewards, achievements)
+- Contratos desplegados en Celo Mainnet (recovery + rewards)
 - Cuenta en [Vercel](https://vercel.com)
 
 ---
@@ -36,75 +36,76 @@ En **Project → Settings → Environment Variables**, añade todo lo de `.env.e
 En Supabase: **Project Settings → Database → Connection string**
 
 - **DATABASE_URL** → *Transaction pooler* + `?pgbouncer=true` (y suele añadirse `connection_limit=1` en Vercel)
-- **DIRECT_URL** → *Session pooler* puerto **5432** en el mismo host `pooler.supabase.com` (Vercel no alcanza bien `db.xxx.supabase.co` por IPv6). Solo usa `db.xxx.supabase.co` en local si quieres.
+- **DIRECT_URL** → *Session pooler* puerto **5432** en el mismo host `pooler.supabase.com`
 
 Ejemplo (sustituye password y host del pooler):
 
 ```env
-DATABASE_URL="postgresql://postgres.fcecrahllkwyjycstbis:PASSWORD@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1&sslmode=require"
-DIRECT_URL="postgresql://postgres.fcecrahllkwyjycstbis:PASSWORD@aws-1-us-east-2.pooler.supabase.com:5432/postgres?sslmode=require"
+DATABASE_URL="postgresql://postgres.PROJECT_REF:PASSWORD@aws-0-REGION.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1&sslmode=require"
+DIRECT_URL="postgresql://postgres.PROJECT_REF:PASSWORD@aws-0-REGION.pooler.supabase.com:5432/postgres?sslmode=require"
 ```
 
-### Red Celo (testnet)
+### Red Celo (mainnet)
 
 ```env
-NEXT_PUBLIC_CELO_NETWORK=sepolia
-CELO_NETWORK=sepolia
-CELO_SEPOLIA_RPC_URL=https://forno.celo-sepolia.celo-testnet.org
-CELO_RPC_URL=https://forno.celo-sepolia.celo-testnet.org
-NEXT_PUBLIC_CELO_RPC_URL=https://forno.celo-sepolia.celo-testnet.org
+NEXT_PUBLIC_CELO_NETWORK=mainnet
+CELO_NETWORK=mainnet
+CELO_RPC_URL=https://forno.celo.org
+NEXT_PUBLIC_CELO_RPC_URL=https://forno.celo.org
 ```
 
-### Contratos y tesorería
+### Contratos, tokens y tesorería
 
-Copia desde tu `.env` local (mismos valores que ya usas):
+```env
+RECOVERY_TREASURY_ADDRESS=0x089189B7942588bDBAdcc5cFc8E76d8bd1073bd4
+NEXT_PUBLIC_RECOVERY_TREASURY=0x089189B7942588bDBAdcc5cFc8E76d8bd1073bd4
 
-- `TCOPM_ADDRESS` / `NEXT_PUBLIC_TCOPM_ADDRESS`
-- `USDC_ADDRESS` / `NEXT_PUBLIC_USDC_ADDRESS`
-- `RECOVERY_CONTRACT_ADDRESS` / `NEXT_PUBLIC_RECOVERY_CONTRACT_ADDRESS`
-- `REWARDS_CONTRACT_ADDRESS` / `NEXT_PUBLIC_REWARDS_CONTRACT_ADDRESS`
-- `REWARDS_AUTOMATOR_ADDRESS` (opcional — wallet del cron)
-- `CRON_SECRET` — protege `/api/cron/seasons`
-- `RECOVERY_TREASURY_ADDRESS` / `NEXT_PUBLIC_RECOVERY_TREASURY`
-- `RECOVERY_PRICE_USD_CENTS=10`
-- `NEXT_PUBLIC_RECOVERY_PRICE_USD_CENTS=10`
+RECOVERY_CONTRACT_ADDRESS=0x3e67516C6809162124411f5e88D16EE75e738983
+NEXT_PUBLIC_RECOVERY_CONTRACT_ADDRESS=0x3e67516C6809162124411f5e88D16EE75e738983
+
+REWARDS_CONTRACT_ADDRESS=0xA975A17D5f6D3a081Ad617b437867eF0CfD27F95
+NEXT_PUBLIC_REWARDS_CONTRACT_ADDRESS=0xA975A17D5f6D3a081Ad617b437867eF0CfD27F95
+REWARDS_AUTOMATOR_ADDRESS=0x089189B7942588bDBAdcc5cFc8E76d8bd1073bd4
+
+USDC_ADDRESS=0xcebA9300f2b948710d2653dD7B07f33A8B32118C
+NEXT_PUBLIC_USDC_ADDRESS=0xcebA9300f2b948710d2653dD7B07f33A8B32118C
+
+CCOPM_ADDRESS=0x8A567e2aE79CA692Bd748aB832081C45de4041eA
+NEXT_PUBLIC_CCOPM_ADDRESS=0x8A567e2aE79CA692Bd748aB832081C45de4041eA
+
+RECOVERY_PRICE_USD_CENTS=1
+NEXT_PUBLIC_RECOVERY_PRICE_USD_CENTS=1
+RECOVERY_CCOPM_FIXED=10
+NEXT_PUBLIC_RECOVERY_CCOPM_FIXED=10
+```
 
 ### Servidor (secreto — solo Production)
 
 - `DEPLOYER_PRIVATE_KEY` — pagos admin, recompensas USDC, envío de tokens  
   **Nunca** marques esta variable como expuesta al cliente.
+- `CRON_SECRET` — protege `/api/cron/seasons`
 
-### Producción — flags que deben quedar así
+### Flags de producción
 
 ```env
 RECOVERY_DEMO_MODE=false
 NEXT_PUBLIC_RECOVERY_DEMO_MODE=false
 ```
 
-**No** definas `ALLOW_DAILY_CHALLENGE_RETRY` en producción pública salvo demos controladas (ver abajo).
-
-### Demo en Vercel (repetir reto del día)
-
-En **Sepolia** los reintentos del mismo día vienen **activados por defecto** (modo demo/QA).
-
-Opcional en **Environment Variables → Production**:
+Reintentos del reto diario (pitch/demo):
 
 ```env
-ALLOW_DAILY_CHALLENGE_RETRY=true   # forzar también en mainnet
-ALLOW_DAILY_CHALLENGE_RETRY=false  # un intento/día en Sepolia
+ALLOW_DAILY_CHALLENGE_RETRY=true   # activo en mainnet por defecto en código
+ALLOW_DAILY_CHALLENGE_RETRY=false  # un intento/día
 ```
 
-Luego **Redeploy** si cambias estas variables.
-
 ### URL de la app
-
-Tras el **primer** deploy tendrás algo como `https://celoquest-xxx.vercel.app`. Luego:
 
 ```env
 NEXT_PUBLIC_APP_URL=https://tu-dominio.vercel.app
 ```
 
-Añádela en Vercel y haz **Redeploy**.
+Añádela en Vercel y haz **Redeploy** tras el primer deploy.
 
 ---
 
@@ -116,7 +117,7 @@ Añádela en Vercel y haz **Redeploy**.
    - Revisa `DATABASE_URL` / `DIRECT_URL` y que Supabase permita conexiones
    - Logs: `prisma migrate deploy` necesita `DIRECT_URL` válida
 
-Comprueba: `https://tu-app.vercel.app/api/health` → `{ "ok": true, ... }`
+Comprueba: `https://tu-app.vercel.app/api/health` → `{ "ok": true, "network": "mainnet", "dbOk": true, ... }`
 
 ---
 
@@ -125,44 +126,36 @@ Comprueba: `https://tu-app.vercel.app/api/health` → `{ "ok": true, ... }`
 Ejecuta **desde tu máquina** contra la misma base de datos de producción:
 
 ```bash
-# Cargar preguntas (33 ítems ES/EN)
 npm run db:seed
-
-# Si ya había datos y quieres forzar:
-# npm run db:seed:force
 ```
 
 ### Fondear recompensas USDC
 
-1. Despliega `CeloQuestRewards` con USDC: `npm run contracts:deploy:rewards`
-2. Transfiere USDC al contrato (o `deposit` como owner)
-3. Configura `CRON_SECRET` en Vercel — el cron en `vercel.json` llama `/api/cron/seasons` cada lunes
-4. El admin puede forzar pago manual desde el panel (usa `finalizeSeasonRewardForced`)
+1. Transfiere USDC al contrato `CeloQuestRewards` (o `deposit` como owner)
+2. El cron en `vercel.json` llama `/api/cron/seasons` cada lunes
+3. El admin puede forzar pago manual desde el panel (`finalizeSeasonRewardForced`)
 
 ---
 
-## 5. Checklist “90% listo”
+## 5. Checklist producción
 
-| Área | Estado tras seguir esta guía |
-|------|------------------------------|
+| Área | Estado |
+|------|--------|
 | App web (quiz, XP, ranking) | ✅ |
 | DB Supabase + migraciones en build | ✅ |
-| Preguntas (seed manual) | ✅ tras `db:seed` |
-| Recuperación de vidas on-chain | ✅ si contratos en env |
-| Recompensas semanales (3 USDC) | ✅ cron + admin force |
+| Preguntas (`db:seed`) | ✅ tras seed manual |
+| Recuperación de vidas (USDC / cCOP → treasury) | ✅ con env correcto |
+| Recompensas semanales USDC | ✅ cron + admin force |
 | Logros personales (in-app) | ✅ |
 | Dominio custom | Opcional (Vercel → Domains) |
 
 ---
 
-## 6. Cambios mínimos después
+## 6. Flujo de pagos en producción
 
-Solo tendrás que tocar Vercel/env cuando:
+**Recuperación de vida:** transferencia directa USDC o cCOP al treasury. El backend verifica el recibo on-chain y restaura 1 vida.
 
-- Cambies de **Sepolia → mainnet** (ver `docs/MAINNET_MIGRATION.md`)
-- Redespliegues **nuevos contratos**
-- Añadas **dominio propio** → actualiza `NEXT_PUBLIC_APP_URL`, `nft:sync`, `setBaseURI`
-- Rote **DEPLOYER_PRIVATE_KEY** (seguridad)
+**Premio semanal:** `CeloQuestRewards.finalizeSeasonReward` envía USDC al campeón (#1 del ranking).
 
 ---
 
@@ -170,7 +163,7 @@ Solo tendrás que tocar Vercel/env cuando:
 
 ```bash
 npx vercel login
-npx vercel link          # en la carpeta celoquest
+npx vercel link
 npx vercel env pull .env.vercel.local
 npx vercel --prod
 ```
@@ -181,7 +174,7 @@ npx vercel --prod
 
 - `.env` local **no** se sube a git (está en `.gitignore`)
 - `DEPLOYER_PRIVATE_KEY` solo en Vercel → Environment Variables → Production
-- Admin por wallet: `0x089189b7942588bdbadcc5cfc8e76d8bd1073bd4` (migración inicial)
+- Admin por wallet: `0x089189B7942588bDBAdcc5cFc8E76d8bd1073bd4`
 
 ---
 
@@ -191,7 +184,8 @@ npx vercel --prod
 |----------|----------|
 | Build falla en `migrate deploy` | `DIRECT_URL` correcta; IP allowlist en Supabase |
 | App lenta / too many connections | Usa pooler en `DATABASE_URL`, no directo |
-| Reto diario repetible en prod | No debería pasar; `NODE_ENV=production` bloquea retry |
-| NFT sin imagen en wallet | `localhost` en metadata → pasos NFT arriba |
+| `/api/health` muestra `sepolia` | Corrige `CELO_NETWORK` y `NEXT_PUBLIC_CELO_NETWORK` en Vercel |
 | Sin preguntas | `npm run db:seed` contra prod DB |
-| Recovery no funciona | Revisa contratos + treasury en env |
+| USDC funciona, cCOP no | Revisa `CCOPM_ADDRESS` y saldo cCOP del usuario |
+| Recovery no verifica | Revisa `RECOVERY_TREASURY_ADDRESS` y monto esperado (0.01 USDC / 10 cCOP) |
+| Premio no paga | Fondea `CeloQuestRewards` con USDC; revisa `CRON_SECRET` y `REWARDS_AUTOMATOR_ADDRESS` |

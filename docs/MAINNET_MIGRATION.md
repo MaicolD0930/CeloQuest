@@ -1,10 +1,16 @@
-# Migración a Celo Mainnet (referencia futura)
+# Celo Mainnet — estado actual
 
-> **Estado actual:** CeloQuest sigue en **Celo Sepolia (testnet)** con `tCOPM`.  
-> Este documento recoge el plan para una futura demo o producción en **Celo Mainnet**.  
-> No ejecutar hasta decidir migrar.
+> **Migración completada.** CeloQuest opera en **Celo Mainnet** con USDC y cCOP.  
+> Documentación vigente:
+> - [`README.md`](../README.md)
+> - [`contracts/README.md`](../contracts/README.md)
+> - [`docs/VERCEL_DEPLOY.md`](VERCEL_DEPLOY.md)
 
 ---
+
+# Migración a Celo Mainnet (referencia histórica)
+
+> El contenido siguiente describe el plan original de migración. Ya aplicado en producción.
 
 ## Objetivo
 
