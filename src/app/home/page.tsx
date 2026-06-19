@@ -25,6 +25,7 @@ import { AppVersionBadge } from "@/components/AppVersionBadge";
 import { ChallengeCompletedCard } from "@/components/ChallengeCompletedCard";
 import { useMe } from "@/hooks/useMe";
 import { prefetchChallengeToday } from "@/lib/client/challenge-cache";
+import { useAppChainConfig } from "@/hooks/useAppChainConfig";
 
 type WalletBalanceCell = {
   configured: boolean;
@@ -46,8 +47,16 @@ export default function HomePage() {
   });
   const [balances, setBalances] = useState<BalancesResponse | null>(null);
   const [balancesLoading, setBalancesLoading] = useState(false);
-  const copmToken = getCopmTokenConfig();
-  const usdcToken = getUsdcTokenConfig();
+  const chainConfig = useAppChainConfig();
+  const copmToken = chainConfig?.tokens.copm
+    ? {
+        symbol: chainConfig.tokens.copm.symbol,
+        id: chainConfig.tokens.copm.id,
+      }
+    : getCopmTokenConfig();
+  const usdcToken = chainConfig?.tokens.usdc
+    ? { symbol: chainConfig.tokens.usdc.symbol }
+    : getUsdcTokenConfig();
 
   useEffect(() => {
     if (!data?.today.completed) {
@@ -265,7 +274,7 @@ export default function HomePage() {
             symbol: balances?.tcopm.symbol ?? copmToken.symbol,
             balance:
               balances && !balances.tcopm.error
-                ? `${balances.tcopm.display} ${balances.tcopm.symbol ?? copmToken.symbol}`
+                ? `${balances.tcopm.display} ${balances.tcopm.symbol}`
                 : null,
             loading: balancesLoading,
             error: balances?.tcopm.error ?? false,
