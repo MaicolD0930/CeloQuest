@@ -379,7 +379,7 @@ const es = {
     minipayAmountHint:
       "MiniPay puede mostrar muchos ceros: es normal. El importe real es el del selector (ej. 355 tCOPM ≈ 0.10 USD).",
     minipayAmountHintMainnet:
-      "Pago con USDC oficial de MiniPay. Importe: {amount} por recuperación.",
+      "Elige USDC o cCOP. Importe según selector: {amount}. Si cCOP falla, usa USDC.",
     minipayAmountHintFallback: "0.01 USDC",
     wrongNetwork: "Cambia tu wallet a Celo Sepolia e intenta de nuevo",
     wrongNetworkMainnet: "Cambia tu wallet a Celo Mainnet e intenta de nuevo",
@@ -876,7 +876,7 @@ const en: Dict = {
     minipayAmountHint:
       "MiniPay may show many zeros — that's normal. The real amount is in the selector (e.g. 355 tCOPM ≈ 0.10 USD).",
     minipayAmountHintMainnet:
-      "Pay with official MiniPay USDC. Amount: {amount} per recovery.",
+      "Choose USDC or cCOP. Amount per selector: {amount}. If cCOP fails, use USDC.",
     minipayAmountHintFallback: "0.01 USDC",
     refillInvalidPayment: "Payment does not match your account or the expected amount",
     refillServerRetry:

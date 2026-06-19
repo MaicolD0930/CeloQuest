@@ -12,6 +12,8 @@ export const MINIPAY_SEPOLIA = {
 export const MINIPAY_MAINNET = {
   USDC: "0xcebA9300f2b948710d2653dD7B07f33A8B32118C",
   USDC_ADAPTER: "0x2F25deB3848C207fc8E0c34035B3Ba7fC157602B",
+  /** Mento COPm — experimental in MiniPay (no fee adapter). */
+  CCOPM: "0x8A567e2aE79CA692Bd748aB832081C45de4041eA",
 } as const;
 
 function readCustomTcopmAddress(): string | null {
@@ -35,8 +37,7 @@ export function getMiniPayUsdcAddress(): `0x${string}` {
 }
 
 /**
- * MiniPay Mini Apps support USDC / USDm / USDT only (docs.minipay.xyz).
- * Life recovery in MiniPay is always USDC.
+ * MiniPay recovery tokens — USDC always; cCOP on mainnet (experimental).
  */
 export function getMiniPayRecoveryTokenId(): RecoveryTokenId {
   return "USDC";
@@ -50,6 +51,9 @@ export function resolveMiniPaySendTokenAddress(
   if (tokenId === "USDC") {
     return getMiniPayUsdcAddress();
   }
+  if (tokenId === "cCOPM" && getCeloNetwork() === "mainnet") {
+    return MINIPAY_MAINNET.CCOPM;
+  }
   return configured;
 }
 
@@ -62,13 +66,19 @@ export function resolveRecoveryVerifyTokenAddresses(
   if (tokenId === "USDC") {
     set.add(getMiniPayUsdcAddress().toLowerCase());
   }
+  if (tokenId === "cCOPM" && getCeloNetwork() === "mainnet") {
+    set.add(MINIPAY_MAINNET.CCOPM.toLowerCase());
+  }
   return [...set] as `0x${string}`[];
 }
 
-/** MiniPay: USDC only — cCOP/tCOPM require MetaMask/Rabby. */
+/** MiniPay: USDC + experimental cCOP on mainnet. */
 export function filterRecoveryTokensForMiniPay<T extends { id: RecoveryTokenId }>(
   tokens: T[]
 ): T[] {
+  if (getCeloNetwork() === "mainnet") {
+    return tokens.filter((t) => t.id === "USDC" || t.id === "cCOPM");
+  }
   return tokens.filter((t) => t.id === "USDC");
 }
 
@@ -79,7 +89,9 @@ export function isMiniPaySendableToken(
 ): boolean {
   if (!configured) return false;
   if (tokenId === "USDC") return true;
-  if (tokenId === "cCOPM") return false;
+  if (tokenId === "cCOPM") {
+    return getCeloNetwork() === "mainnet";
+  }
   if (tokenId === "tCOPM") {
     return !isCustomSepoliaTcopm(configured);
   }

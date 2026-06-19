@@ -132,8 +132,6 @@ export default function ChallengePage() {
     if (miniPay) {
       setSelectedWallet("minipay");
       savePreferredWalletProvider("minipay");
-      setSelectedToken("USDC");
-      setRecoveryTokens(["USDC"]);
       return;
     }
     setSelectedWallet(getPreferredWalletProvider());
@@ -269,10 +267,8 @@ export default function ChallengePage() {
         if (Object.keys(labels).length > 0) setTokenPriceLabels(labels);
         if (ids.length > 0) {
           setRecoveryTokens(ids);
-          let preferred: RecoveryToken = miniPay ? "USDC" : ids[0];
-          const tokenOrder = miniPay
-            ? (["USDC"] as RecoveryToken[])
-            : ids;
+          let preferred: RecoveryToken = ids[0];
+          const tokenOrder = ids;
           for (const id of tokenOrder) {
             try {
               const balRes = await fetch(
@@ -748,7 +744,7 @@ export default function ChallengePage() {
       setRefillError(t.connect.walletNotInstalled);
       return;
     }
-    const payToken: RecoveryToken = miniPay ? "USDC" : selectedToken;
+    const payToken: RecoveryToken = selectedToken;
     setRefilling(true);
     setRefillStep("wallet");
     setRefillStatus(t.challenge.openingWallet);
@@ -1008,12 +1004,12 @@ export default function ChallengePage() {
               install: t.connect.installWallet,
             }}
             hideWalletPicker={miniPay}
-            hideTokenPicker={miniPay}
+            hideTokenPicker={miniPay && recoveryTokens.length <= 1}
             minipayHint={
               miniPay
                 ? minipayRecoveryHint(
                     t,
-                    tokenPriceLabels.USDC ?? undefined
+                    tokenPriceLabels[selectedToken] ?? undefined
                   )
                 : undefined
             }
