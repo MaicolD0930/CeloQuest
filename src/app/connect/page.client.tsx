@@ -25,7 +25,6 @@ import { apiFetchJson, isApiClientError } from "@/lib/client/api-fetch";
 import { formatApiErrorMessage } from "@/lib/client/format-api-error";
 import { useIsMiniPay } from "@/hooks/useIsMiniPay";
 import { connectWrongNetworkMessage } from "@/lib/i18n/network-ui";
-import { loadClientChainConfig } from "@/lib/chain/app-config-client";
 
 const AVATARS = ["🦊", "🐸", "🦁", "🐼", "🦄", "🐙", "🦉", "🐢"];
 const FETCH_OPTS: RequestInit = { credentials: "include" };
@@ -172,9 +171,6 @@ export default function ConnectPage() {
     setConnecting(true);
     let connectedAddress: string | null = null;
     try {
-      if (miniPay) {
-        await loadClientChainConfig();
-      }
       savePreferredWalletProvider(providerId);
       const address = await connectWallet(providerId);
       connectedAddress = address;
@@ -206,9 +202,24 @@ export default function ConnectPage() {
 
   useEffect(() => {
     if (!miniPay || walletAddress || autoConnectStarted.current) return;
-    autoConnectStarted.current = true;
-    void handleConnect("minipay");
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- auto-connect once when MiniPay is detected
+
+    let cancelled = false;
+    const attempt = (delayMs: number) => {
+      window.setTimeout(() => {
+        if (cancelled || autoConnectStarted.current) return;
+        if (!getWalletProvider("minipay")) return;
+        autoConnectStarted.current = true;
+        void handleConnect("minipay");
+      }, delayMs);
+    };
+
+    attempt(400);
+    attempt(1200);
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- auto-connect when MiniPay is detected
   }, [miniPay, walletAddress]);
 
   async function handleContinue() {

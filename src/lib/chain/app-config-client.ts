@@ -1,3 +1,4 @@
+import type { EIP1193Provider } from "viem";
 import type { CeloNetwork } from "@/lib/chain/config";
 import { setClientNetworkOverride } from "@/lib/chain/config";
 
@@ -21,8 +22,28 @@ export type AppChainConfig = {
   };
 };
 
+const CELO_MAINNET_CHAIN_ID = 42220;
+const CELO_SEPOLIA_CHAIN_ID = 11142220;
+
 let cached: AppChainConfig | null = null;
 let inflight: Promise<AppChainConfig> | null = null;
+
+async function readProviderChainId(provider: EIP1193Provider): Promise<number> {
+  const hex = (await provider.request({ method: "eth_chainId" })) as string;
+  return Number.parseInt(hex, 16);
+}
+
+export function applyChainIdToClient(chainId: number): CeloNetwork | null {
+  if (chainId === CELO_MAINNET_CHAIN_ID) {
+    setClientNetworkOverride("mainnet");
+    return "mainnet";
+  }
+  if (chainId === CELO_SEPOLIA_CHAIN_ID) {
+    setClientNetworkOverride("sepolia");
+    return "sepolia";
+  }
+  return null;
+}
 
 export function getClientChainConfig(): AppChainConfig | null {
   return cached;
@@ -44,7 +65,6 @@ export async function loadClientChainConfig(): Promise<AppChainConfig> {
       })
       .then((data) => {
         cached = data;
-        setClientNetworkOverride(data.network);
         return data;
       })
       .finally(() => {
@@ -52,6 +72,54 @@ export async function loadClientChainConfig(): Promise<AppChainConfig> {
       });
   }
   return inflight;
+}
+
+/**
+ * MiniPay connect: trust the wallet's active chain (cannot switch programmatically).
+ * Never blocks connection — server config loads in background for tokens/prices.
+ */
+export async function initMiniPayConnect(provider: EIP1193Provider): Promise<void> {
+  try {
+    const chainId = await readProviderChainId(provider);
+    applyChainIdToClient(chainId);
+  } catch {
+    try {
+      const cfg = await loadClientChainConfig();
+      setClientNetworkOverride(cfg.network);
+    } catch {
+      /* build-time / production default applies */
+    }
+  }
+
+  void loadClientChainConfig()
+    .then(async (cfg) => {
+      try {
+        const walletChain = await readProviderChainId(provider);
+        if (walletChain === cfg.chainId) {
+          setClientNetworkOverride(cfg.network);
+        }
+      } catch {
+        setClientNetworkOverride(cfg.network);
+      }
+    })
+    .catch(() => {});
+}
+
+/** MiniPay payment: wallet chain must match server (mainnet on Vercel). */
+export async function assertMiniPayServerNetwork(
+  provider: EIP1193Provider
+): Promise<void> {
+  const cfg = await loadClientChainConfig();
+  let walletChain: number;
+  try {
+    walletChain = await readProviderChainId(provider);
+  } catch {
+    throw new Error("WRONG_NETWORK");
+  }
+  if (walletChain !== cfg.chainId) {
+    throw new Error("WRONG_NETWORK");
+  }
+  setClientNetworkOverride(cfg.network);
 }
 
 export async function getExpectedChainId(): Promise<number> {

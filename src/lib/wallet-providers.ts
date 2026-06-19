@@ -1,6 +1,5 @@
 import type { EIP1193Provider } from "viem";
 import { getActiveChain } from "@/lib/chain/config";
-import { getExpectedChainId } from "@/lib/chain/app-config-client";
 
 export type WalletProviderId = "metamask" | "rabby" | "minipay";
 
@@ -188,23 +187,6 @@ export async function getProviderChainId(
 ): Promise<number> {
   const hex = (await provider.request({ method: "eth_chainId" })) as string;
   return Number.parseInt(hex, 16);
-}
-
-/**
- * MiniPay cannot switch chains programmatically — only verify the wallet is
- * already on the network the app expects (from server runtime config when loaded).
- */
-export async function assertProviderOnActiveChain(
-  provider: EIP1193Provider
-): Promise<void> {
-  const expected = await getExpectedChainId();
-  let current: number;
-  try {
-    current = await getProviderChainId(provider);
-  } catch {
-    throw new Error("WRONG_NETWORK");
-  }
-  if (current !== expected) throw new Error("WRONG_NETWORK");
 }
 
 /** Switch (or add) the active Celo network on the chosen wallet. */
