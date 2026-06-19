@@ -1,9 +1,13 @@
 import { encodeFunctionData } from "viem";
+import { getCeloNetwork } from "@/lib/chain/config";
+import { getMiniPayUsdcAddress } from "@/lib/chain/minipay-tokens";
 import { recoveryPaymentAbi } from "@/lib/contracts/recovery-payment-abi";
 import {
   getRecoveryContractAddress,
+  getRecoveryPaymentPublicClient,
   readRecoveryPriceForTokenId,
 } from "@/lib/contracts/recovery-payment";
+
 import {
   formatRecoveryPriceFromAtomic,
   getRecoveryPricingMetaAsync,
@@ -14,7 +18,6 @@ import {
   normalizeRecoveryTokenParam,
   type RecoveryTokenId,
 } from "@/lib/tokens/recovery";
-import { getRecoveryPaymentPublicClient } from "@/lib/contracts/recovery-payment";
 
 export type PreparedRecoveryPayment = {
   token: RecoveryTokenId;
@@ -60,18 +63,23 @@ export async function prepareRecoveryPayment(
     throw new Error("PAYMENT_NOT_CONFIGURED");
   }
 
-  const recoveryPrice = await readRecoveryPriceForTokenId(token, config.address);
+  const tokenAddress =
+    token === "USDC" && getCeloNetwork() === "mainnet"
+      ? getMiniPayUsdcAddress()
+      : config.address;
+
+  const recoveryPrice = await readRecoveryPriceForTokenId(token, tokenAddress);
   const meta = await getRecoveryPricingMetaAsync();
 
   encodeFunctionData({
     abi: recoveryPaymentAbi,
     functionName: "purchaseRecovery",
-    args: [config.address],
+    args: [tokenAddress],
   });
 
   return {
     token,
-    tokenAddress: config.address,
+    tokenAddress,
     contractAddress,
     treasuryAddress,
     recoveryPrice: recoveryPrice.toString(),

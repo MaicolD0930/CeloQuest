@@ -88,6 +88,12 @@ function buildEconomyFromLogs(
   };
 }
 
+function parsePaymentAmount(raw: string): number {
+  const normalized = raw.trim().replace(/\s/g, "").replace(",", ".");
+  const n = Number(normalized);
+  return Number.isFinite(n) ? n : 0;
+}
+
 async function fetchPaymentEconomyFromDb() {
   const copm = getCopmTokenConfig();
   const payments = await prisma.payment.findMany({
@@ -99,8 +105,8 @@ async function fetchPaymentEconomyFromDb() {
   let usdcTotal = 0;
 
   for (const row of payments) {
-    const amount = Number(row.amount);
-    if (!Number.isFinite(amount)) continue;
+    const amount = parsePaymentAmount(row.amount);
+    if (amount <= 0) continue;
     const sym = row.tokenSymbol.trim().toUpperCase();
     if (sym === "USDC") {
       usdcTotal += amount;
@@ -111,8 +117,8 @@ async function fetchPaymentEconomyFromDb() {
 
   return {
     paymentCount: payments.length,
-    totalCopm: copmTotal.toLocaleString(undefined, { maximumFractionDigits: 2 }),
-    totalUsdc: usdcTotal.toLocaleString(undefined, { maximumFractionDigits: 2 }),
+    totalCopm: copmTotal.toFixed(2),
+    totalUsdc: usdcTotal.toFixed(2),
     copmSymbol: copm.symbol,
   };
 }

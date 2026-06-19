@@ -6,7 +6,7 @@ export const REWARDS_CONTRACT_ADDRESS =
   "";
 
 /** Shown in UI (marketing prize). */
-export const WEEKLY_REWARD_USDC_DISPLAY = "5";
+export const WEEKLY_REWARD_USDC_DISPLAY = "3";
 /** Actually transferred on-chain (6-decimal USDC). */
 export const WEEKLY_REWARD_USDC_ACTUAL = "0.05";
 /** @deprecated Use WEEKLY_REWARD_USDC_DISPLAY for UI. */

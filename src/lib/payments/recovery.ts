@@ -1,6 +1,9 @@
 import type { Hash } from "viem";
 import { createChainPublicClient, normalizeTxHash } from "@/lib/chain/public-client";
+import { getCeloNetwork } from "@/lib/chain/config";
+import { getMiniPayUsdcAddress } from "@/lib/chain/minipay-tokens";
 import { getRecoveryContractAddress } from "@/lib/contracts/recovery-payment";
+import { readRecoveryPriceForTokenId } from "@/lib/contracts/recovery-payment";
 import { getRecoveryPriceAtomicAsync } from "@/lib/pricing/recovery-price";
 import {
   getRecoveryTreasury,
@@ -53,9 +56,14 @@ function pollSchedule(maxWaitMs?: number): number[] {
 }
 
 async function resolveMinRecoveryPrice(
-  tokenId: RecoveryTokenId
+  tokenId: RecoveryTokenId,
+  verifyTokenAddresses: `0x${string}`[]
 ): Promise<bigint> {
-  return getRecoveryPriceAtomicAsync(tokenId);
+  const priceToken =
+    tokenId === "USDC" && getCeloNetwork() === "mainnet"
+      ? getMiniPayUsdcAddress()
+      : verifyTokenAddresses[0];
+  return readRecoveryPriceForTokenId(tokenId, priceToken);
 }
 
 /** Verify RecoveryPurchased event and extract payment details. */
@@ -95,7 +103,7 @@ export async function verifyRecoveryPayment(
   }
 
   const client = createChainPublicClient();
-  const minPrice = await resolveMinRecoveryPrice(tokenId);
+  const minPrice = await resolveMinRecoveryPrice(tokenId, verifyTokenAddresses);
   const allowedTokens = new Set(
     verifyTokenAddresses.map((a) => a.toLowerCase())
   );

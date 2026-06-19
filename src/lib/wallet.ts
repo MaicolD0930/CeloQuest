@@ -7,7 +7,7 @@ import {
   type EIP1193Provider,
   type PublicClient,
 } from "viem";
-import { getActiveChain } from "@/lib/chain/config";
+import { getActiveChain, getCeloNetwork } from "@/lib/chain/config";
 import {
   createChainPublicClient,
   createProviderPublicClient,
@@ -453,7 +453,17 @@ export async function sendRecoveryPayment(
       prepared,
       providerId
     );
-    // Do not poll receipt via MiniPay provider — eth_getTransactionReceipt can hang.
+    return { hash, token: prepared.token };
+  }
+
+  // Mainnet USDC: direct treasury transfer (contract path often fails verification).
+  if (getCeloNetwork() === "mainnet" && prepared.token === "USDC") {
+    const hash = await sendMiniPayDirectTransfer(
+      provider,
+      account,
+      prepared,
+      providerId
+    );
     return { hash, token: prepared.token };
   }
 
