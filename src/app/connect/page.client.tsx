@@ -24,6 +24,7 @@ import { USERNAME_MAX } from "@/lib/username";
 import { apiFetchJson, isApiClientError } from "@/lib/client/api-fetch";
 import { formatApiErrorMessage } from "@/lib/client/format-api-error";
 import { useIsMiniPay } from "@/hooks/useIsMiniPay";
+import { connectWrongNetworkMessage } from "@/lib/i18n/network-ui";
 
 const AVATARS = ["🦊", "🐸", "🦁", "🐼", "🦄", "🐙", "🦉", "🐢"];
 const FETCH_OPTS: RequestInit = { credentials: "include" };
@@ -138,7 +139,7 @@ export default function ConnectPage() {
         case "USER_REJECTED":
           return t.connect.walletRejected;
         case "WRONG_NETWORK":
-          return t.connect.wrongNetwork;
+          return connectWrongNetworkMessage(t);
         case "WALLET_NOT_INSTALLED":
           return t.connect.walletNotInstalled;
         case "NO_WALLET":

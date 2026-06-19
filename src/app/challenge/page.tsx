@@ -35,6 +35,10 @@ import { WalletPicker } from "@/components/WalletPicker";
 import { useIsMiniPay } from "@/hooks/useIsMiniPay";
 import { isCustomSepoliaTcopm, filterRecoveryTokensForMiniPay } from "@/lib/chain/minipay-tokens";
 import {
+  challengeWrongNetworkMessage,
+  minipayRecoveryHint,
+} from "@/lib/i18n/network-ui";
+import {
   clearPendingRefill,
   pollRefillUntilConfirmed,
   readPendingRefill,
@@ -665,7 +669,7 @@ export default function ChallengePage() {
         case "USER_REJECTED":
           return t.challenge.paymentRejected;
         case "WRONG_NETWORK":
-          return miniPay ? t.challenge.wrongNetworkMiniPay : t.challenge.wrongNetwork;
+          return challengeWrongNetworkMessage(t, miniPay);
         case "WALLET_NOT_INSTALLED":
           return t.connect.walletNotInstalled;
         case "NO_WALLET":
@@ -1006,7 +1010,12 @@ export default function ChallengePage() {
             hideWalletPicker={miniPay}
             hideTokenPicker={miniPay}
             minipayHint={
-              miniPay ? t.challenge.minipayAmountHint : undefined
+              miniPay
+                ? minipayRecoveryHint(
+                    t,
+                    tokenPriceLabels.USDC ?? undefined
+                  )
+                : undefined
             }
           />
         </main>

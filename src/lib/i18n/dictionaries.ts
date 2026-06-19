@@ -113,6 +113,8 @@ const es = {
     walletNotInstalled: "Esa wallet no está instalada en este navegador",
     walletRejected: "Rechazaste la solicitud en la wallet",
     wrongNetwork: "No se pudo cambiar a Celo Sepolia. Hazlo manualmente en tu wallet",
+    wrongNetworkMainnet:
+      "No se pudo cambiar a Celo Mainnet. Hazlo manualmente en tu wallet",
   },
   profile: {
     menu: "Menú de perfil",
@@ -376,6 +378,15 @@ const es = {
       "Tu saldo tCOPM es del contrato de prueba de CeloQuest. MiniPay solo envía USDC/USDm oficiales — usa USDC aquí o MetaMask para tCOPM.",
     minipayAmountHint:
       "MiniPay puede mostrar muchos ceros: es normal. El importe real es el del selector (ej. 355 tCOPM ≈ 0.10 USD).",
+    minipayAmountHintMainnet:
+      "Pago con USDC oficial de MiniPay. Importe: {amount} por recuperación.",
+    minipayAmountHintFallback: "0.01 USDC",
+    wrongNetwork: "Cambia tu wallet a Celo Sepolia e intenta de nuevo",
+    wrongNetworkMainnet: "Cambia tu wallet a Celo Mainnet e intenta de nuevo",
+    wrongNetworkMiniPay:
+      "En MiniPay activa «Usar red de prueba» en Ajustes → Developer (Celo Sepolia). La app no puede cambiar la red por ti.",
+    wrongNetworkMiniPayMainnet:
+      "MiniPay debe estar en Celo Mainnet. Desactiva «Usar red de prueba» en Ajustes → Developer si la tienes activa.",
     refillInvalidPayment: "El pago no coincide con tu cuenta o el monto esperado",
     refillServerRetry:
       "El servidor tardó en confirmar el pago. No pagues otra vez: espera unos segundos o vuelve a Jugar.",
@@ -392,9 +403,6 @@ const es = {
     walletMismatch:
       "La wallet activa no coincide con tu cuenta. Cambia a la cuenta con la que entraste",
     paymentRejected: "Cancelaste el pago en la wallet",
-    wrongNetwork: "Cambia tu wallet a Celo Sepolia e intenta de nuevo",
-    wrongNetworkMiniPay:
-      "En MiniPay activa «Usar red de prueba» en Ajustes → Developer (Celo Sepolia). La app no puede cambiar la red por ti.",
     loadError: "No pudimos cargar las preguntas de hoy.",
     readyTitle: "¿Listo para el reto?",
     readySubtitle: "5 preguntas · 1 vida · gana XP",
@@ -602,6 +610,8 @@ const en: Dict = {
     walletNotInstalled: "That wallet is not installed in this browser",
     walletRejected: "You rejected the request in your wallet",
     wrongNetwork: "Could not switch to Celo Sepolia. Switch manually in your wallet",
+    wrongNetworkMainnet:
+      "Could not switch to Celo Mainnet. Switch manually in your wallet",
   },
   profile: {
     menu: "Profile menu",
@@ -865,6 +875,9 @@ const en: Dict = {
       "Your tCOPM balance is from CeloQuest's test contract. MiniPay only sends official USDC/USDm — use USDC here or MetaMask for tCOPM.",
     minipayAmountHint:
       "MiniPay may show many zeros — that's normal. The real amount is in the selector (e.g. 355 tCOPM ≈ 0.10 USD).",
+    minipayAmountHintMainnet:
+      "Pay with official MiniPay USDC. Amount: {amount} per recovery.",
+    minipayAmountHintFallback: "0.01 USDC",
     refillInvalidPayment: "Payment does not match your account or the expected amount",
     refillServerRetry:
       "The server is still confirming your payment. Do not pay again — wait a few seconds or return to Play.",
@@ -882,8 +895,11 @@ const en: Dict = {
       "The active wallet does not match your account. Switch to the account you signed in with",
     paymentRejected: "You cancelled the payment in your wallet",
     wrongNetwork: "Switch your wallet to Celo Sepolia and try again",
+    wrongNetworkMainnet: "Switch your wallet to Celo Mainnet and try again",
     wrongNetworkMiniPay:
       "In MiniPay enable “Use Testnet” under Settings → Developer (Celo Sepolia). The app cannot switch networks for you.",
+    wrongNetworkMiniPayMainnet:
+      "MiniPay must be on Celo Mainnet. Turn off “Use Testnet” under Settings → Developer if it is enabled.",
     loadError: "We couldn't load today's questions.",
     readyTitle: "Ready for the challenge?",
     readySubtitle: "5 questions · 1 life · earn XP",

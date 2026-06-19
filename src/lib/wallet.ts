@@ -26,6 +26,7 @@ import {
 } from "@/lib/tokens/tcopm";
 import {
   discoverWalletProviders,
+  assertProviderOnActiveChain,
   ensureCorrectChain,
   hasAnyWalletInstalled,
   resolveWalletProvider,
@@ -200,10 +201,10 @@ async function sendWalletTransaction(
 export async function connectWallet(providerId?: WalletProviderId): Promise<string> {
   const provider = resolveWalletProvider(providerId);
   const miniPayConnect = isMiniPayPayment(providerId);
-  try {
+  if (miniPayConnect) {
+    await assertProviderOnActiveChain(provider);
+  } else {
     await ensureCorrectChain(provider);
-  } catch (err) {
-    if (!miniPayConnect) throw err;
   }
   const client = createWalletClient({
     chain: getActiveChain(),
@@ -438,6 +439,7 @@ export async function sendRecoveryPayment(
   }
 
   if (miniPayPay) {
+    await assertProviderOnActiveChain(provider);
     const hash = await sendMiniPayDirectTransfer(
       provider,
       account,
