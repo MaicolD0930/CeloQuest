@@ -1,9 +1,5 @@
-import {
-  createPublicClient,
-  http,
-  type PublicClient,
-} from "viem";
-import { getActiveChain, getRpcUrl } from "@/lib/chain/config";
+import type { PublicClient } from "viem";
+import { createChainPublicClient } from "@/lib/chain/public-client";
 import { recoveryPaymentAbi } from "@/lib/contracts/recovery-payment-abi";
 import type { RecoveryTokenId } from "@/lib/tokens/recovery";
 import { getRecoveryPriceAtomicAsync } from "@/lib/pricing/recovery-price";
@@ -17,10 +13,7 @@ export function getRecoveryContractAddress(): `0x${string}` | null {
 }
 
 export function getRecoveryPaymentPublicClient(): PublicClient {
-  return createPublicClient({
-    chain: getActiveChain(),
-    transport: http(getRpcUrl()),
-  });
+  return createChainPublicClient();
 }
 
 /** Read per-token recovery price from the on-chain contract. */

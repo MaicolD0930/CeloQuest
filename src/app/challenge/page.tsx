@@ -142,12 +142,17 @@ export default function ChallengePage() {
     let cancelled = false;
 
     async function loadBalance() {
+      setTokenBalance(null);
       try {
         const res = await fetch(
           `/api/wallet/recovery-balance?token=${encodeURIComponent(selectedToken)}`,
           { credentials: "include" }
         );
-        if (!res.ok || cancelled) return;
+        if (cancelled) return;
+        if (!res.ok) {
+          setTokenBalance(null);
+          return;
+        }
         const payload = await res.json();
         if (!cancelled) {
           setTokenBalance(`${payload.display} ${payload.symbol}`);
@@ -795,7 +800,7 @@ export default function ChallengePage() {
             return;
           }
         }
-        if (miniPay && typeof bal.display === "string" && bal.symbol) {
+        if (typeof bal.display === "string" && bal.symbol) {
           setTokenBalance(`${bal.display} ${bal.symbol}`);
         }
         if (

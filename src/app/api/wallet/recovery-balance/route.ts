@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { formatUnits } from "viem";
 import { getCurrentUser } from "@/lib/session";
+import { getCeloNetwork } from "@/lib/chain/config";
+import { createChainPublicClient } from "@/lib/chain/public-client";
+import { getMiniPayUsdcAddress } from "@/lib/chain/minipay-tokens";
 import { erc20ExtendedAbi } from "@/lib/contracts/recovery-payment-abi";
 import {
   getRecoveryContractAddress,
-  getRecoveryPaymentPublicClient,
   readRecoveryPriceForToken,
 } from "@/lib/contracts/recovery-payment";
 import {
@@ -36,23 +38,27 @@ export async function GET(req: NextRequest) {
   }
 
   const wallet = user.walletAddress as `0x${string}`;
-  const client = getRecoveryPaymentPublicClient();
+  const tokenAddress =
+    tokenId === "USDC" && getCeloNetwork() === "mainnet"
+      ? getMiniPayUsdcAddress()
+      : config.address;
+  const client = createChainPublicClient();
 
   try {
     const [raw, allowance, onChainPrice] = await Promise.all([
       client.readContract({
-        address: config.address,
+        address: tokenAddress,
         abi: erc20ExtendedAbi,
         functionName: "balanceOf",
         args: [wallet],
       }),
       client.readContract({
-        address: config.address,
+        address: tokenAddress,
         abi: erc20ExtendedAbi,
         functionName: "allowance",
         args: [wallet, contract],
       }),
-      readRecoveryPriceForToken(config.address),
+      readRecoveryPriceForToken(tokenAddress),
     ]);
 
     const required =
@@ -77,7 +83,7 @@ export async function GET(req: NextRequest) {
       sufficient: raw >= required,
       allowance: allowance.toString(),
       allowanceSufficient: allowance >= required,
-      tokenAddress: config.address,
+      tokenAddress: tokenAddress,
       contractAddress: contract,
       walletAddress: user.walletAddress,
     });

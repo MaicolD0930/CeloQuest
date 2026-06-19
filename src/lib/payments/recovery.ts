@@ -125,7 +125,41 @@ export async function verifyRecoveryPayment(
       return { ok: false, reason: "TX_FAILED" };
     }
 
-    if (payerWallet.toLowerCase() !== fromWallet.toLowerCase()) {
+    if (treasuryAddress) {
+      const treasuryDecoded = decodeTreasuryTransferFromReceipt(receipt, {
+        txHash: normalizedHash,
+        allowedTokenAddresses: allowedTokens,
+        treasuryAddress,
+        payerWallet: fromWallet,
+        minPrice,
+        tokenParam: token,
+      });
+      if (treasuryDecoded.ok) {
+        return treasuryDecoded;
+      }
+
+      for (const verifyAddress of verifyTokenAddresses) {
+        const directDecoded = decodeDirectTransferFromReceipt(receipt, {
+          txHash: normalizedHash,
+          tokenAddress: verifyAddress,
+          treasuryAddress,
+          fromWallet: payerWallet ?? fromWallet,
+          minPrice,
+          tokenParam: token,
+        });
+
+        if (directDecoded.ok) {
+          return directDecoded;
+        }
+
+        lastReason = directDecoded.reason;
+      }
+    }
+
+    if (
+      payerWallet &&
+      payerWallet.toLowerCase() !== fromWallet.toLowerCase()
+    ) {
       return { ok: false, reason: "WALLET_MISMATCH" };
     }
 
@@ -158,38 +192,7 @@ export async function verifyRecoveryPayment(
       return contractDecoded;
     }
 
-    if (treasuryAddress) {
-      const treasuryDecoded = decodeTreasuryTransferFromReceipt(receipt, {
-        txHash: normalizedHash,
-        allowedTokenAddresses: allowedTokens,
-        treasuryAddress,
-        payerWallet,
-        minPrice,
-        tokenParam: token,
-      });
-      if (treasuryDecoded.ok) {
-        return treasuryDecoded;
-      }
-
-      for (const verifyAddress of verifyTokenAddresses) {
-        const directDecoded = decodeDirectTransferFromReceipt(receipt, {
-          txHash: normalizedHash,
-          tokenAddress: verifyAddress,
-          treasuryAddress,
-          fromWallet: payerWallet,
-          minPrice,
-          tokenParam: token,
-        });
-
-        if (directDecoded.ok) {
-          return directDecoded;
-        }
-
-        lastReason = directDecoded.reason;
-      }
-    } else {
-      lastReason = contractDecoded.reason;
-    }
+    lastReason = contractDecoded.reason;
     // Receipt mined but logs not indexed yet — keep polling.
   }
 

@@ -65,6 +65,9 @@ export function resolveRecoveryVerifyTokenAddresses(
   const set = new Set<string>([configured.toLowerCase()]);
   if (tokenId === "USDC") {
     set.add(getMiniPayUsdcAddress().toLowerCase());
+    if (getCeloNetwork() === "mainnet") {
+      set.add(MINIPAY_MAINNET.USDC_ADAPTER.toLowerCase());
+    }
   }
   if (tokenId === "cCOPM" && getCeloNetwork() === "mainnet") {
     set.add(MINIPAY_MAINNET.CCOPM.toLowerCase());

@@ -88,6 +88,35 @@ function buildEconomyFromLogs(
   };
 }
 
+async function fetchPaymentEconomyFromDb() {
+  const copm = getCopmTokenConfig();
+  const payments = await prisma.payment.findMany({
+    where: { status: { in: ["confirmed", "pending"] } },
+    select: { tokenSymbol: true, amount: true },
+  });
+
+  let copmTotal = 0;
+  let usdcTotal = 0;
+
+  for (const row of payments) {
+    const amount = Number(row.amount);
+    if (!Number.isFinite(amount)) continue;
+    const sym = row.tokenSymbol.trim().toUpperCase();
+    if (sym === "USDC") {
+      usdcTotal += amount;
+    } else {
+      copmTotal += amount;
+    }
+  }
+
+  return {
+    paymentCount: payments.length,
+    totalCopm: copmTotal.toLocaleString(undefined, { maximumFractionDigits: 2 }),
+    totalUsdc: usdcTotal.toLocaleString(undefined, { maximumFractionDigits: 2 }),
+    copmSymbol: copm.symbol,
+  };
+}
+
 async function fetchRecoveryEconomyStats() {
   const contract = getRecoveryContractAddress();
   const copm = getCopmTokenConfig();
@@ -246,7 +275,8 @@ export async function getAdminStats() {
     newUsersThisWeek,
     dbPayments,
     usersByXp,
-    economy,
+    dbEconomy,
+    economyOnChain,
   ] = await Promise.all([
     prisma.user.count(),
     prisma.user.count({
@@ -271,11 +301,12 @@ export async function getAdminStats() {
         createdAt: true,
       },
     }),
+    fetchPaymentEconomyFromDb(),
     fetchRecoveryEconomyStats(),
   ]);
 
   const recentPayments = await attachUsernamesToPayments(
-    mergeRecentPayments(dbPayments, economy.onChainPayments)
+    mergeRecentPayments(dbPayments, economyOnChain.onChainPayments)
   );
 
   const users = usersByXp.map((user, index) => ({
@@ -333,10 +364,10 @@ export async function getAdminStats() {
       weekKey: weekKey(now),
     },
     economy: {
-      paymentCount: economy.paymentCount,
-      totalCopm: economy.totalCopm,
-      totalUsdc: economy.totalUsdc,
-      copmSymbol: economy.copmSymbol,
+      paymentCount: dbEconomy.paymentCount,
+      totalCopm: dbEconomy.totalCopm,
+      totalUsdc: dbEconomy.totalUsdc,
+      copmSymbol: dbEconomy.copmSymbol,
       recentPayments,
     },
     tokens: {
