@@ -456,8 +456,12 @@ export async function sendRecoveryPayment(
     return { hash, token: prepared.token };
   }
 
-  // Mainnet USDC: direct treasury transfer (contract path often fails verification).
-  if (getCeloNetwork() === "mainnet" && prepared.token === "USDC") {
+  // Mainnet browser (Vercel / Rabby / MetaMask): direct treasury transfer for USDC + cCOP.
+  // Avoids RecoveryPaymentContract when env or token allowlist is misconfigured.
+  if (
+    getCeloNetwork() === "mainnet" &&
+    (prepared.token === "USDC" || prepared.token === "cCOPM")
+  ) {
     const hash = await sendMiniPayDirectTransfer(
       provider,
       account,
