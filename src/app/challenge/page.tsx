@@ -38,6 +38,7 @@ import {
   challengeWrongNetworkMessage,
   minipayRecoveryHint,
 } from "@/lib/i18n/network-ui";
+import { loadClientChainConfig } from "@/lib/chain/app-config-client";
 import {
   clearPendingRefill,
   pollRefillUntilConfirmed,
@@ -749,6 +750,10 @@ export default function ChallengePage() {
     setRefillStep("wallet");
     setRefillStatus(t.challenge.openingWallet);
     try {
+      if (miniPay) {
+        await loadClientChainConfig();
+      }
+
       let payerWallet = sessionWallet;
 
       if (miniPay) {

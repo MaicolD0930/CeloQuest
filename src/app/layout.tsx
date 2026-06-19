@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Fredoka, Nunito } from "next/font/google";
 import "./globals.css";
 import { LocaleProvider } from "@/lib/i18n/LocaleProvider";
+import { AppConfigLoader } from "@/components/AppConfigLoader";
 
 const nunito = Nunito({
   variable: "--font-nunito",
@@ -37,9 +38,11 @@ export default function RootLayout({
     <html lang="es" className={`${nunito.variable} ${fredoka.variable} h-full antialiased`}>
       <body className="min-h-dvh bg-h-background">
         <LocaleProvider>
-          <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col overflow-x-hidden">
-            {children}
-          </div>
+          <AppConfigLoader>
+            <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col overflow-x-hidden">
+              {children}
+            </div>
+          </AppConfigLoader>
         </LocaleProvider>
       </body>
     </html>

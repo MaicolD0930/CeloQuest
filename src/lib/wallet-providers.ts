@@ -1,5 +1,6 @@
 import type { EIP1193Provider } from "viem";
 import { getActiveChain } from "@/lib/chain/config";
+import { getExpectedChainId } from "@/lib/chain/app-config-client";
 
 export type WalletProviderId = "metamask" | "rabby" | "minipay";
 
@@ -191,12 +192,12 @@ export async function getProviderChainId(
 
 /**
  * MiniPay cannot switch chains programmatically — only verify the wallet is
- * already on the network the app expects.
+ * already on the network the app expects (from server runtime config when loaded).
  */
 export async function assertProviderOnActiveChain(
   provider: EIP1193Provider
 ): Promise<void> {
-  const expected = getActiveChain().id;
+  const expected = await getExpectedChainId();
   let current: number;
   try {
     current = await getProviderChainId(provider);

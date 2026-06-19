@@ -25,6 +25,7 @@ import { apiFetchJson, isApiClientError } from "@/lib/client/api-fetch";
 import { formatApiErrorMessage } from "@/lib/client/format-api-error";
 import { useIsMiniPay } from "@/hooks/useIsMiniPay";
 import { connectWrongNetworkMessage } from "@/lib/i18n/network-ui";
+import { loadClientChainConfig } from "@/lib/chain/app-config-client";
 
 const AVATARS = ["🦊", "🐸", "🦁", "🐼", "🦄", "🐙", "🦉", "🐢"];
 const FETCH_OPTS: RequestInit = { credentials: "include" };
@@ -171,6 +172,9 @@ export default function ConnectPage() {
     setConnecting(true);
     let connectedAddress: string | null = null;
     try {
+      if (miniPay) {
+        await loadClientChainConfig();
+      }
       savePreferredWalletProvider(providerId);
       const address = await connectWallet(providerId);
       connectedAddress = address;

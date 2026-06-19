@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getRecoveryContractAddress } from "@/lib/contracts/recovery-payment";
 import { getAvailableRecoveryTokens } from "@/lib/tokens/recovery";
+import { getCeloNetwork, getChainId } from "@/lib/chain/config";
 import { prisma } from "@/lib/prisma";
 
 /** Lightweight probe for uptime checks (Vercel, monitoring). */
@@ -19,7 +20,8 @@ export async function GET() {
   return NextResponse.json({
     ok: dbOk,
     service: "celoquest",
-    network: process.env.NEXT_PUBLIC_CELO_NETWORK ?? "sepolia",
+    network: getCeloNetwork(),
+    chainId: getChainId(),
     paymentsConfigured: Boolean(contract && tokens.length > 0),
     dbOk,
     recoveryTokens: tokens.map((t) => t.id),

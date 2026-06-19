@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { createPublicClient, formatUnits, http } from "viem";
 import { getCurrentUser } from "@/lib/session";
-import { getActiveChain, getRpcUrl } from "@/lib/chain/config";
+import { getActiveChain, getRpcUrl, getCeloNetwork } from "@/lib/chain/config";
+import { getMiniPayUsdcAddress } from "@/lib/chain/minipay-tokens";
 import { erc20Abi } from "@/lib/tokens/erc20";
 import { getCopmBalance } from "@/lib/tokens/tcopm";
 import { getCopmTokenConfig, getUsdcTokenConfig } from "@/lib/tokens/recovery";
@@ -53,12 +54,16 @@ export async function GET() {
 
   if (usdcConfig.address) {
     try {
+      const usdcAddress =
+        getCeloNetwork() === "mainnet"
+          ? getMiniPayUsdcAddress()
+          : usdcConfig.address;
       const client = createPublicClient({
         chain: getActiveChain(),
         transport: http(getRpcUrl()),
       });
       const raw = await client.readContract({
-        address: usdcConfig.address,
+        address: usdcAddress,
         abi: erc20Abi,
         functionName: "balanceOf",
         args: [wallet],
@@ -70,5 +75,10 @@ export async function GET() {
     }
   }
 
-  return NextResponse.json({ tcopm, usdc });
+  return NextResponse.json({
+    network: getCeloNetwork(),
+    chainId: getActiveChain().id,
+    tcopm,
+    usdc,
+  });
 }
