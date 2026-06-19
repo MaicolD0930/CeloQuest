@@ -19,6 +19,10 @@ const fredoka = Fredoka({
 export const metadata: Metadata = {
   title: "CeloQuest",
   description: "Learn Web3. Explore Celo. Earn your place.",
+  other: {
+    "talentapp:project_verification":
+      "1770a8a8ae5cce3e0c74ac33a348eb7ff8fd28bb647f273eda1a8adc06667eb779138e3defda4f308560d39a792cc3ff9172beac4352d6c7028077ed90e9fc87",
+  },
 };
 
 export const viewport: Viewport = {
