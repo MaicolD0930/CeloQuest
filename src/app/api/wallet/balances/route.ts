@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { createPublicClient, formatUnits, http } from "viem";
+import { formatUnits } from "viem";
 import { getCurrentUser } from "@/lib/session";
-import { getActiveChain, getRpcUrl, getCeloNetwork } from "@/lib/chain/config";
+import { getActiveChain, getCeloNetwork } from "@/lib/chain/config";
+import { createChainPublicClient } from "@/lib/chain/public-client";
 import { getMiniPayUsdcAddress } from "@/lib/chain/minipay-tokens";
 import { erc20Abi } from "@/lib/tokens/erc20";
 import { getCopmBalance } from "@/lib/tokens/tcopm";
@@ -58,10 +59,7 @@ export async function GET() {
         getCeloNetwork() === "mainnet"
           ? getMiniPayUsdcAddress()
           : usdcConfig.address;
-      const client = createPublicClient({
-        chain: getActiveChain(),
-        transport: http(getRpcUrl()),
-      });
+      const client = createChainPublicClient();
       const raw = await client.readContract({
         address: usdcAddress,
         abi: erc20Abi,

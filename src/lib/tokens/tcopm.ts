@@ -2,10 +2,10 @@ import {
   createPublicClient,
   encodeFunctionData,
   formatUnits,
-  http,
   type Hash,
 } from "viem";
-import { getActiveChain, getRpcUrl } from "@/lib/chain/config";
+import { getActiveChain } from "@/lib/chain/config";
+import { createChainPublicClient } from "@/lib/chain/public-client";
 import { erc20Abi } from "@/lib/tokens/erc20";
 import {
   getCopmTokenConfig,
@@ -33,10 +33,7 @@ export type PreparedCopmRecoveryTransfer = {
 };
 
 function getPublicClient() {
-  return createPublicClient({
-    chain: getActiveChain(),
-    transport: http(getRpcUrl()),
-  });
+  return createChainPublicClient();
 }
 
 /** Read the user's COPM balance (tCOPM on Sepolia, cCOPM on mainnet). */

@@ -16,18 +16,22 @@ export function getRpcUrls(): string[] {
   const urls: string[] = [];
 
   if (network === "mainnet") {
-    if (process.env.CELO_RPC_URL) urls.push(process.env.CELO_RPC_URL);
-    if (process.env.NEXT_PUBLIC_CELO_RPC_URL) {
-      urls.push(process.env.NEXT_PUBLIC_CELO_RPC_URL);
+    for (const url of [
+      process.env.CELO_RPC_URL,
+      process.env.NEXT_PUBLIC_CELO_RPC_URL,
+      celo.rpcUrls.default.http[0],
+    ]) {
+      if (url && !url.toLowerCase().includes("sepolia")) urls.push(url);
     }
-    urls.push(celo.rpcUrls.default.http[0]);
   } else {
     if (process.env.CELO_SEPOLIA_RPC_URL) {
       urls.push(process.env.CELO_SEPOLIA_RPC_URL);
     }
-    if (process.env.CELO_RPC_URL) urls.push(process.env.CELO_RPC_URL);
-    if (process.env.NEXT_PUBLIC_CELO_RPC_URL) {
-      urls.push(process.env.NEXT_PUBLIC_CELO_RPC_URL);
+    for (const url of [
+      process.env.CELO_RPC_URL,
+      process.env.NEXT_PUBLIC_CELO_RPC_URL,
+    ]) {
+      if (url && url.toLowerCase().includes("sepolia")) urls.push(url);
     }
     urls.push(celoSepolia.rpcUrls.default.http[0]);
     urls.push("https://forno.celo-sepolia.celo-testnet.org");

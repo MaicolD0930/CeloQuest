@@ -36,21 +36,33 @@ export function getActiveChain(): Chain {
   return getCeloNetwork() === "mainnet" ? celo : celoSepolia;
 }
 
+function isSepoliaRpcUrl(url: string): boolean {
+  const lower = url.toLowerCase();
+  return lower.includes("sepolia") || lower.includes("celo-testnet");
+}
+
+function pickMainnetRpc(): string {
+  const candidates = [
+    process.env.CELO_RPC_URL,
+    process.env.NEXT_PUBLIC_CELO_RPC_URL,
+    celo.rpcUrls.default.http[0],
+  ].filter((u): u is string => Boolean(u));
+  return candidates.find((u) => !isSepoliaRpcUrl(u)) ?? celo.rpcUrls.default.http[0];
+}
+
+function pickSepoliaRpc(): string {
+  const candidates = [
+    process.env.CELO_SEPOLIA_RPC_URL,
+    process.env.CELO_RPC_URL,
+    process.env.NEXT_PUBLIC_CELO_RPC_URL,
+    celoSepolia.rpcUrls.default.http[0],
+    "https://forno.celo-sepolia.celo-testnet.org",
+  ].filter((u): u is string => Boolean(u));
+  return candidates.find((u) => isSepoliaRpcUrl(u)) ?? celoSepolia.rpcUrls.default.http[0];
+}
+
 export function getRpcUrl(): string {
-  const network = getCeloNetwork();
-  if (network === "mainnet") {
-    return (
-      process.env.CELO_RPC_URL ??
-      process.env.NEXT_PUBLIC_CELO_RPC_URL ??
-      celo.rpcUrls.default.http[0]
-    );
-  }
-  return (
-    process.env.CELO_SEPOLIA_RPC_URL ??
-    process.env.CELO_RPC_URL ??
-    process.env.NEXT_PUBLIC_CELO_RPC_URL ??
-    celoSepolia.rpcUrls.default.http[0]
-  );
+  return getCeloNetwork() === "mainnet" ? pickMainnetRpc() : pickSepoliaRpc();
 }
 
 export function getChainId(): number {
