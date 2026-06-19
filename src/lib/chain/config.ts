@@ -10,17 +10,24 @@ export function setClientNetworkOverride(network: CeloNetwork): void {
   clientNetworkOverride = network;
 }
 
+function resolveNetworkFromEnv(): CeloNetwork {
+  // Server (Vercel): CELO_NETWORK is runtime — must win over build-time NEXT_PUBLIC_*.
+  const raw =
+    typeof window === "undefined"
+      ? (process.env.CELO_NETWORK ??
+        process.env.NEXT_PUBLIC_CELO_NETWORK ??
+        (process.env.NODE_ENV === "production" ? "mainnet" : "sepolia"))
+      : (process.env.NEXT_PUBLIC_CELO_NETWORK ??
+        process.env.CELO_NETWORK ??
+        (process.env.NODE_ENV === "production" ? "mainnet" : "sepolia"));
+  return raw.toLowerCase() === "mainnet" ? "mainnet" : "sepolia";
+}
+
 export function getCeloNetwork(): CeloNetwork {
   if (typeof window !== "undefined" && clientNetworkOverride) {
     return clientNetworkOverride;
   }
-
-  const network = (
-    process.env.NEXT_PUBLIC_CELO_NETWORK ??
-    process.env.CELO_NETWORK ??
-    (process.env.NODE_ENV === "production" ? "mainnet" : "sepolia")
-  ).toLowerCase();
-  return network === "mainnet" ? "mainnet" : "sepolia";
+  return resolveNetworkFromEnv();
 }
 
 export function getActiveChain(): Chain {

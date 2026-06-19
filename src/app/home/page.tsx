@@ -102,7 +102,7 @@ export default function HomePage() {
     return () => {
       cancelled = true;
     };
-  }, [data?.user.walletAddress, copmToken.symbol, usdcToken.symbol]);
+  }, [data?.user.walletAddress, chainConfig?.network, copmToken.symbol, usdcToken.symbol]);
 
   if (loading || !data) {
     return (
@@ -270,11 +270,11 @@ export default function HomePage() {
 
         <WalletBalancesRow
           tcopm={{
-            label: `${t.home.balancePrefix} ${balances?.tcopm.symbol ?? copmToken.symbol}`,
-            symbol: balances?.tcopm.symbol ?? copmToken.symbol,
+            label: `${t.home.balancePrefix} ${copmToken.symbol}`,
+            symbol: copmToken.symbol,
             balance:
               balances && !balances.tcopm.error
-                ? `${balances.tcopm.display} ${balances.tcopm.symbol}`
+                ? `${balances.tcopm.display} ${copmToken.symbol}`
                 : null,
             loading: balancesLoading,
             error: balances?.tcopm.error ?? false,
