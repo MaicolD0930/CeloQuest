@@ -206,19 +206,21 @@ export async function connectWallet(providerId?: WalletProviderId): Promise<stri
   const provider = resolveWalletProvider(providerId);
   const miniPayConnect = isMiniPayPayment(providerId);
 
-  if (miniPayConnect) {
-    await initMiniPayConnect(provider);
-  } else {
-    await loadClientChainConfig().catch(() => {});
-    await ensureCorrectChain(provider);
-  }
-
+  // MiniPay: obtain account first — do not wait on /api/app-config (can hang or fail in WebView).
   const client = createWalletClient({
     chain: getActiveChain(),
     transport: custom(provider),
   });
   const [address] = await client.requestAddresses();
   if (!address) throw new Error("NO_ACCOUNT");
+
+  if (miniPayConnect) {
+    initMiniPayConnect(provider);
+  } else {
+    void loadClientChainConfig().catch(() => {});
+    await ensureCorrectChain(provider);
+  }
+
   return address;
 }
 

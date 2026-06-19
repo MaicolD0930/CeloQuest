@@ -61,14 +61,10 @@ export async function loadClientChainConfig(): Promise<AppChainConfig> {
 }
 
 /**
- * MiniPay connect: never block on wallet chain — UI/tokens follow server mainnet config.
+ * MiniPay connect: load server config in background — never block wallet address request.
  */
-export async function initMiniPayConnect(_provider: EIP1193Provider): Promise<void> {
-  try {
-    await loadClientChainConfig();
-  } catch {
-    /* build-time / production default applies */
-  }
+export function initMiniPayConnect(_provider: EIP1193Provider): void {
+  void loadClientChainConfig().catch(() => {});
 }
 
 /** MiniPay payment: wallet chain must match server (mainnet on Vercel). */

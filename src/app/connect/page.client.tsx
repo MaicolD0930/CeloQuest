@@ -95,7 +95,10 @@ export default function ConnectPage() {
     }
   }
 
-  async function loginWithWallet(address: string) {
+  async function loginWithWallet(
+    address: string,
+    attempt = 0
+  ): Promise<"returning" | "needsProfile" | "error"> {
     try {
       const { data } = await apiFetchJson<Record<string, unknown>>("/api/users", {
         ...FETCH_OPTS,
@@ -118,8 +121,25 @@ export default function ConnectPage() {
       setNeedsProfile(true);
       return "needsProfile" as const;
     } catch (err) {
+      if (
+        isApiClientError(err) &&
+        attempt < 2 &&
+        (err.kind === "API_DOWN" ||
+          err.kind === "TIMEOUT" ||
+          err.kind === "NETWORK" ||
+          err.code === "SERVER_ERROR" ||
+          err.code === "DATABASE_ERROR")
+      ) {
+        await new Promise((r) => setTimeout(r, 1200 * (attempt + 1)));
+        return loginWithWallet(address, attempt + 1);
+      }
+
       if (isApiClientError(err)) {
-        if (err.code) {
+        if (
+          err.code &&
+          err.code !== "SERVER_ERROR" &&
+          err.code !== "DATABASE_ERROR"
+        ) {
           setError(usernameErrorMessage(err.code));
           return "error" as const;
         }

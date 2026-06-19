@@ -11,13 +11,12 @@ export function setClientNetworkOverride(network: CeloNetwork): void {
 }
 
 function resolveNetworkFromEnv(): CeloNetwork {
-  // Server (Vercel): CELO_NETWORK is runtime — must win over build-time NEXT_PUBLIC_*.
-  const raw =
-    typeof window === "undefined"
-      ? (process.env.CELO_NETWORK ??
-        process.env.NEXT_PUBLIC_CELO_NETWORK ??
+  const isServer = typeof window === "undefined";
+  // Server: only CELO_NETWORK (runtime). Ignore NEXT_PUBLIC baked at build time.
+  const raw = isServer
+    ? (process.env.CELO_NETWORK ??
         (process.env.NODE_ENV === "production" ? "mainnet" : "sepolia"))
-      : (process.env.NEXT_PUBLIC_CELO_NETWORK ??
+    : (process.env.NEXT_PUBLIC_CELO_NETWORK ??
         process.env.CELO_NETWORK ??
         (process.env.NODE_ENV === "production" ? "mainnet" : "sepolia"));
   return raw.toLowerCase() === "mainnet" ? "mainnet" : "sepolia";
